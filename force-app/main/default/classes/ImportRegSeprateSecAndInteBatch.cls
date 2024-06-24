@@ -1,12 +1,4 @@
-/*************************
-* Created By : Foram 
-* Cereated Date : 12-09-2023
-* Description : Import Registration from Evntsair and 
-Create Contact/Lead, Registartion
-**************************/
-
-public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<ResponseWrapper>, Database.AllowsCallouts {
-    
+public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<ResponseWrapper>, Database.AllowsCallouts {
     //variable declartion
     public String strEventId;
     public String sfeventId;
@@ -29,7 +21,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     List<Manage_Eventsair_Reg_Apex_batch__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c 
                                                             from Manage_Eventsair_Reg_Apex_batch__c LIMIT 1];
     
-    public ImportRegistartionFromEventsAirBatch(String eventId, String strsfeventId) {        
+    public ImportRegSeprateSecAndInteBatch(String eventId, String strsfeventId) {        
         strEventId = eventId;
         sfeventId = strsfeventId;
     }
