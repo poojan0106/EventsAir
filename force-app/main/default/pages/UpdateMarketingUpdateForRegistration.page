@@ -1,0 +1,2 @@
+<apex:page standardController="Event__c" extensions="UpdateMarketingUpdateOnRegistrations" action="{!UpdateRegistrations}" >
+</apex:page>

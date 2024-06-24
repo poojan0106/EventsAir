@@ -1,0 +1,1 @@
+{"data":{"event":{"id":"64D2B569-F05D-46E2-B2BC-22B8DDD06D5D","name":"Naturally Good 2023","startDate":"2023-06-05","endDate":"2023-06-06","venue":{"name":"ICC Sydney","city":"Darling Harbour","state":"NSW","country":"Australia"},"logo":null}}}

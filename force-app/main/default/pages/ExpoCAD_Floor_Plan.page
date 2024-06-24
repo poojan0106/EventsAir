@@ -1,0 +1,65 @@
+<!--************************************************************************************************************
+* @description  : Displays Floor Plan Graph
+* @changes      : 2018-10-11 - CI - Referenced the Expocad Credentials
+*************************************************************************************************************/-->
+<apex:page docType="html-5.0" standardController="Event__c">
+  <div id="container">
+        <!--<h5>Postmessage Results:</h5>-->
+        <p id="data">
+        
+            <!--<apex:form >
+            <apex:commandbutton value="FxSalesLogout" onclick="doFxSalesLogout(this.event); return false;"></apex:commandbutton>
+            <apex:commandbutton value="ZoomBooth" onclick="doZoomBooth(940); return false;"></apex:commandbutton>
+            </apex:form>-->
+       
+       
+        </p>
+    </div>
+    <div id="expoFrame">
+
+        <!--<apex:iframe id="expoApexFrame" src="https://www.expocad.com/host/fx/dea/{!Event__c.ExpoCAD_ID__c}/exfx.html?mode=sales" />-->
+        <apex:iframe id="expoApexFrame" src="https://divcomausb.expocad.com/Events/{!Event__c.ExpoCAD_ID__c}/index.html?mode=sales" /> 
+    </div>
+    
+    <script type="text/javascript">
+
+        function log(message) {
+            document.getElementById("data").innerHTML += message + "<br /><br />";
+            console.log(event.data);
+        }
+        
+        window.addEventListener("message", function(event) {
+            if (event.origin !== "https://www.expocad.com") return;
+          
+            if (event.data == "CloseFX") {
+                var frame = document.getElementById('expoApexFrame');
+                
+            
+            }
+         
+            log("<em>" + event.data  + "</em>");
+        });
+        
+
+        document.getElementById('expoApexFrame').onload = function() {
+            var frame = document.getElementById('expoApexFrame');
+            
+            <!-- Pass FX Sales creds to iFrame -->
+            frame.contentWindow.postMessage('{!$User.ExpoCAD_Credentials__c}', 'https://divcomausb.expocad.com');
+            
+        }
+
+       
+        function doFxSalesLogout(event) {
+            var frame = document.getElementById('expoApexFrame');
+            frame.contentWindow.postMessage("fxSalesLogout", 'https://divcomausb.expocad.com');
+        }
+        
+        function doZoomBooth(booth) {
+            var frame = document.getElementById('expoApexFrame');
+            frame.contentWindow.postMessage("zoombooth", 'https://divcomausb.expocad.com');
+        }
+     
+
+    </script>
+</apex:page>
