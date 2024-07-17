@@ -16,7 +16,8 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     Set<String> setofProductId = new Set<String>();
     Map<String, Id> mapOfEventRegTypeIdAndSFPBentryId = new Map<String, Id>();
     Map<String, Decimal> mapOfEventRegTypeIdAndSFPBentryPrice = new Map<String, Decimal>();
-    
+    Map<String, Id> mapOfRecTypeAndProduct = new Map<String, Id>();
+
     //fetch current offset value from custom setting
     List<Manage_Eventsair_Reg_Apex_batch__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c 
                                                             from Manage_Eventsair_Reg_Apex_batch__c LIMIT 1];
@@ -135,6 +136,11 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
         
+        List<Event__c> eventData = [Select Id,Name,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
+        List<product2> sfProductList = [SELECT Id,Events__c  ,Events__r.Id, name from product2 where Events__r.Id =:sfeventId];
+        for(product2 prod: sfProductList){
+            mapOfRecTypeAndProduct.put(prod.Name ,prod.Id);
+        }
         String serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
         Map<String, Object> jsonResponse = (Map<String, Object>) JSON.deserializeUntyped(serializedResponseWrapper);
         Map<String, Object> eventDatamap = (Map<String, Object>) jsonResponse.get('data');        
@@ -513,8 +519,13 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 if(eventregPaymentdetails.get('paymentStatus') != null) {
                     objreg.Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');
                 }
-                
-                lstInsrtReg.add(objreg);
+                System.debug(objreg.Registration_Type__c);
+                System.debug(mapOfRecTypeAndProduct);
+                System.debug(mapOfRecTypeAndProduct.containsKey(objreg.Registration_Type__c));
+                if (mapOfRecTypeAndProduct.containsKey(objreg.Registration_Type__c.trim())) {
+
+                    lstInsrtReg.add(objreg);
+                }
                 	system.debug('totalcharge'+totalcharge);
                   if(totalcharge > 0 && isexecuted == false) {
                     if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
@@ -608,65 +619,10 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 
                String strRegTypeId = (String) eventregtypemap.get('id');
                 
-                if(totalcharge>0 && eventregtypemap != null && !setOfProdId.contains(strRegTypeId)) {
-                    //Product2 field mapping start
-                    Product2 newProduct = new Product2();
-                    system.debug('name '+ (String) eventregtypemap.get('name'));
-                    newProduct.Name = (String) eventregtypemap.get('name');
-                    newProduct.EventsAir_ID__c = strRegTypeId;
-                    newProduct.ProductCode = (String) eventregtypemap.get('uniqueCode');
-                    newProduct.Description = 'This is a product from eventsair';
-                    newProduct.IsActive = true;
-                    newProduct.Family = 'Sample Family';
-                    newProduct.IsActive = true;                    
-                    lstInsertproduct.add(newProduct);
-                    setOfProdId.add(strRegTypeId);
-                }
+                
             }            
         }
         
-        if (!lstInsertproduct.isEmpty()) {
-            //Database.insert(lstInsertproduct, Product2.Fields.EventsAir_ID__c, true);
-            System.debug('### lstInsertproduct = '+lstInsertproduct);
-            //insert lstInsertproduct;
-            //============================
-            
-            //Map<String, Id> mapOfEvnproandSfId = new Map<String, Id>();
-            set<String> setOfEvnproIds = new set<String>();
-            
-            for(Product2 p: lstInsertproduct) {
-                setOfEvnproIds.add(p.EventsAir_ID__c);
-            }
-            
-            //do soql on con to fetch data based on eventsair contact id
-            List<Product2> lstexistingproducts = [SELECT Id, EventsAir_ID__c
-                                                  FROM Product2 
-                                                  WHERE EventsAir_ID__c IN: setOfEvnproIds];
-            
-            if(lstexistingproducts.size() > 0) {
-                for(Product2 existingpr: lstexistingproducts) {
-                    mapOfEvnproandSfId.put(existingpr.EventsAir_ID__c, existingpr.Id);
-                }
-            }
-            
-            List<Product2> finallisttoinsertproduct= new List<Product2>();
-            
-            for(Product2 newpr: lstInsertproduct) {
-                if(!mapOfEvnproandSfId.containskey(newpr.EventsAir_ID__c)) {
-                    finallisttoinsertproduct.add(newpr);
-                }
-            }
-            
-            if(finallisttoinsertproduct.size() >0) {
-                system.debug(' finallisttoinsertproduct'+finallisttoinsertproduct);
-                insert finallisttoinsertproduct;
-            }
-            //================================
-            for(Product2 prod: finallisttoinsertproduct) {
-                mapOfEvnproandSfId.put(prod.EventsAir_ID__c, prod.Id);
-            }
-            system.debug(' mapOfEvnproandSfId'+mapOfEvnproandSfId);
-        }
         
         
         for(Object objeventcon: lsteventsairContacts) {
@@ -689,9 +645,12 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 Decimal totalcharge = (Decimal) eventregPaymentdetails.get('totalChargeAmount');
 
                 
-                Object eventfunregtype = eventReg.get('type');                    
+                Object eventfunregtype = eventReg.get('type');        
+                System.debug(eventfunregtype);       
                 eventregtypemap = (Map<String, Object>)eventfunregtype;
                 String strRegTypeId = (String) eventregtypemap.get('id');
+                String strRegTypeName = (String) eventregtypemap.get('name');
+
                 List<Map<String, Object>> listOfFunFeetypemap = new List<Map<String, Object>>();
                 lstfee = (List<Object>) eventregtypemap.get('fees'); 
                 
@@ -699,11 +658,11 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                     
                     Map<String, Object> feemap = (Map<String, Object>)objfee;
                     
-                    if(totalcharge>0 && mapOfEvnproandSfId.containsKey(strRegTypeId) && !setofProductId.contains(strRegTypeId)) {
+                    if(totalcharge>0 && mapOfRecTypeAndProduct.containsKey(strRegTypeName) && !setofProductId.contains(strRegTypeId)) {
                         system.debug(' pricebook');
                         //add to standard pricebook
                         PricebookEntry pbEntry = new PricebookEntry();
-                        pbEntry.Product2Id = mapOfEvnproandSfId.get(strRegTypeId);   
+                        pbEntry.Product2Id = mapOfRecTypeAndProduct.get(strRegTypeName);   
                         if(standardPriceBook != null){
                             pbEntry.Pricebook2Id = standardPriceBook.Id;  
                         }
@@ -717,10 +676,10 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                         //add to custom pricebook
                         PricebookEntry pbEntry2 = new PricebookEntry();
                         system.debug(' mapOfEvnproandSfId'+mapOfEvnproandSfId);
-                        system.debug(' strRegTypeId'+strRegTypeId);
-                        if(mapOfEvnproandSfId.containsKey(strRegTypeId)){
+                        system.debug(' strRegTypeId'+strRegTypeName);
+                        if(mapOfRecTypeAndProduct.containsKey(strRegTypeName)){
                             system.debug(' inside');
-                            pbEntry2.Product2Id = mapOfEvnproandSfId.get(strRegTypeId);                         
+                            pbEntry2.Product2Id = mapOfRecTypeAndProduct.get(strRegTypeName);                         
                         }
                         if(lstPriceook.size()>0){
                             pbEntry2.Pricebook2Id = lstPriceook[0].Id; 
@@ -804,6 +763,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                       Object eventfunregtype = eventReg.get('type');                    
                 eventregtypemap = (Map<String, Object>)eventfunregtype;
                 String strRegTypeId = (String) eventregtypemap.get('id');
+                String strRegTypeName = (String) eventregtypemap.get('name');
                     System.debug('@@@ strRegTypeId = '+strRegTypeId);
                     Object eventregPaydetail = eventReg.get('paymentDetails');                    
                     eventregPaymentdetailsOli = new Map<String, Object>();
@@ -836,7 +796,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                             oli.OpportunityId = mapOfEventConAndSFOppId.get(strevntconId);                    
                             oli.PricebookEntryId = mapOfEventRegTypeIdAndSFPBentryId.get(strRegTypeId);
                             oli.Quantity = 1;
-                            oli.Product2Id =mapOfEvnproandSfId.get(strRegTypeId); 
+                            oli.Product2Id =mapOfRecTypeAndProduct.get(strRegTypeName); 
                             oli.EventsAir_Adjustment__c = (Decimal) eventregPaymentdetailsOli.get('adjustmentAmount');
                             oli.EventsAir_Discount_Amount__c = (Decimal) eventregPaymentdetailsOli.get('discountAmount');
                             if(discountcodeval != null){

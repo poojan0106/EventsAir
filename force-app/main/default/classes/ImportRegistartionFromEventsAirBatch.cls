@@ -792,8 +792,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             }
             
         }  
-        
-        for(Object objeventcon: lsteventsairContacts) {
+        n: lsteventsairContacts) {
             
             Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;  
             
