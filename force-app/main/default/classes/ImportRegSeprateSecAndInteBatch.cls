@@ -16,6 +16,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     Set<String> setofProductId = new Set<String>();
     Map<String, Id> mapOfEventRegTypeIdAndSFPBentryId = new Map<String, Id>();
     Map<String, Decimal> mapOfEventRegTypeIdAndSFPBentryPrice = new Map<String, Decimal>();
+    Map<String, String> selectedValuesMap = new Map<String, String>();
     Map<String, Id> mapOfRecTypeAndProduct = new Map<String, Id>();
 
     //fetch current offset value from custom setting
@@ -30,7 +31,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
         
         System.debug('%%% strEventId = '+strEventId);
-        List<Event__c> eventData = [Select Id,Name,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
+        List<Event__c> eventData = [Select Id,Name,Registration_Types__c,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
         String RecordType = eventData[0].RecordType.Name;
         System.debug('%%% lstcustsett[0].Offset__c = '+lstcustsett[0].Offset__c);
         //get access token
@@ -136,7 +137,13 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
         
-        List<Event__c> eventData = [Select Id,Name,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
+        List<Event__c> eventData = [Select Id,Name,Registration_Types__c,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
+        if (String.isNotBlank(eventData[0].Registration_Types__c)) {
+            List<String> selectedValues = eventData[0].Registration_Types__c.split(';');
+            for (String value : selectedValues) {
+                selectedValuesMap.put(value, value);
+            }
+        }
         List<product2> sfProductList = [SELECT Id,Events__c  ,Events__r.Id, name from product2 where Events__r.Id =:sfeventId];
         for(product2 prod: sfProductList){
             mapOfRecTypeAndProduct.put(prod.Name ,prod.Id);
@@ -520,9 +527,9 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                     objreg.Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');
                 }
                 System.debug(objreg.Registration_Type__c);
-                System.debug(mapOfRecTypeAndProduct);
-                System.debug(mapOfRecTypeAndProduct.containsKey(objreg.Registration_Type__c));
-                if (mapOfRecTypeAndProduct.containsKey(objreg.Registration_Type__c.trim())) {
+                System.debug(selectedValuesMap);
+                System.debug(selectedValuesMap.containsKey(objreg.Registration_Type__c));
+                if (selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {
 
                     lstInsrtReg.add(objreg);
                 }
@@ -1125,5 +1132,31 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
     }
     
     
-    public void finish(Database.BatchableContext BC) {}
+    public void finish(Database.BatchableContext BC) {
+        
+        if(!test.isrunningtest()) {
+            List<Manage_Eventsair_Reg_Apex_batch__c> lstcustsett2 = [SELECT Id, Name, Offset__c, Is_Execute_Next__c 
+                                                                     FROM Manage_Eventsair_Reg_Apex_batch__c LIMIT 1];            
+            // Your finish logic goes here
+            if(lstcustsett2[0].Is_Execute_Next__c == true) {
+                
+                //update offset in custom setting
+                lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
+                update lstcustsett2;
+                
+                ImportRegSeprateSecAndInteBatch newBatch = new ImportRegSeprateSecAndInteBatch(strEventId, sfeventId);
+                Database.executeBatch(newBatch, 500);
+            }
+            else {
+                lstcustsett2[0].Is_Execute_Next__c = true;
+                update lstcustsett2;
+                
+                System.debug('### sfeventId  = '+sfeventId);
+                FeedItem post = new FeedItem();
+                post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+                post.Body = 'Apex batch End for fetching EventsAir Registration Data';
+                insert post;                
+            }
+        } 
+    }
 }

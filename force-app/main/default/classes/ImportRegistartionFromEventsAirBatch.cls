@@ -792,7 +792,8 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             }
             
         }  
-        n: lsteventsairContacts) {
+        
+        for(Object objeventcon: lsteventsairContacts) {
             
             Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;  
             
@@ -1172,5 +1173,32 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
     }
     
     
-    public void finish(Database.BatchableContext BC) {}
+    public void finish(Database.BatchableContext BC) {
+        
+        
+        if(!test.isrunningtest()) {
+            List<Manage_Eventsair_Reg_Apex_batch__c> lstcustsett2 = [SELECT Id, Name, Offset__c, Is_Execute_Next__c 
+                                                                     FROM Manage_Eventsair_Reg_Apex_batch__c LIMIT 1];            
+            // Your finish logic goes here
+            if(lstcustsett2[0].Is_Execute_Next__c == true) {
+                
+                //update offset in custom setting
+                lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
+                update lstcustsett2;
+                
+                ImportRegistartionFromEventsAirBatch newBatch = new ImportRegistartionFromEventsAirBatch(strEventId, sfeventId);
+                Database.executeBatch(newBatch, 500);
+            }
+            else {
+                lstcustsett2[0].Is_Execute_Next__c = true;
+                update lstcustsett2;
+                
+                System.debug('### sfeventId  = '+sfeventId);
+                FeedItem post = new FeedItem();
+                post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+                post.Body = 'Apex batch End for fetching EventsAir Registration Data';
+                insert post;                
+            }
+        }            
+    }
 }

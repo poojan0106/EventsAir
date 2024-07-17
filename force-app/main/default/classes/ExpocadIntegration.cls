@@ -167,11 +167,12 @@ public class ExpocadIntegration {
     }
     
     public static ExpocadWrapper setBoothToRent(String eventName, String boothNumber, String exhibitorId){
-            
+        system.Debug('called SetBoothToRent');
         ExpocadIntegration expoIntegration = new ExpocadIntegration();   
         String requestBody = 'boothNumber=' + EncodingUtil.urlEncode(boothNumber, 'UTF-8') + '&exhibitorId=' + EncodingUtil.urlEncode(exhibitorId, 'UTF-8');
+        System.Debug('requestBody'+requestBody);
         HttpResponse response= expoIntegration.makePutCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/rent' , requestBody);
-        
+        System.Debug('response'+response);
         if (response.getStatusCode() == 200) {
             return new ExpocadWrapper(true, '');
                

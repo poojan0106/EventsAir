@@ -22,13 +22,11 @@ public class OpportunityStageNameUpdateBatch implements Database.Batchable<sObje
             opportunitiesToUpdate.add(opp);
         }
 
-        try {
-            update opportunitiesToUpdate;
-        } catch (Exception e) {
-            System.debug('Error occurred while updating opportunities: ' + e.getMessage());
-        }
+        Database.update(opportunitiesToUpdate, false);
+
     }
     public void finish(Database.BatchableContext context) {
-        
+
+        System.debug('Batch processing finished.');
     }
 }

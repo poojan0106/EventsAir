@@ -331,6 +331,7 @@ public class ExpocadBatchClass implements Database.Batchable<sObject>, Database.
     //Description:- Rent Stand in Expocad
     public static void rentStand(Stand__c stand , String boothJson){
         try{
+            System.Debug('Set booth to rent');
             String exhibitorId=stand.Account_ID__c != null ? stand.Account_ID__c : '';
             // ExpocadWrapper.BoothInfo expocadBooth=  (ExpocadWrapper.BoothInfo) JSON.deserialize(boothJson,  ExpocadWrapper.BoothInfo.class);
             ExpocadWrapper expoRentCallout= ExpocadIntegration.setBoothToRent(stand.Event_Expocad_Id__c , stand.Name ,exhibitorId);

@@ -12,7 +12,7 @@ public class OpportunityStageNameUpdateBatchTest {
         List<Id> opportunityIds = new List<Id>();
         for(Opportunity opp : oppList) { 
             opportunityIds.add(opp.Id);
-            if(opportunityIds.size() == 50) {
+            if(opportunityIds.size() == 20) {
                 recordIdCollections.add(new List<Id>(opportunityIds));
                 opportunityIds.clear();
             }

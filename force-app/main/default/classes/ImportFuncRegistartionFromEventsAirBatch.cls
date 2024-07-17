@@ -74,8 +74,8 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             'functionRegistrations(limit: $regLimit) {' +
             'id,' +
             'tickets,'+  
-             'checkInDate,' +
-             'checkOutDate,' +
+            'checkInDate,' +
+            'checkOutDate,' +
             'feeType {' +
             'id,' +            
             'name,' + 
@@ -200,12 +200,12 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         if(eventmap != null){
             lsteventsairContacts = (List<Object>) eventmap.get('contacts'); 
         }
-       
+        
         System.debug('lsteventsairContacts '+lsteventsairContacts);
         if(lsteventsairContacts.size()>0){
             createRecords(lsteventsairContacts); 
         }
-       
+        
         
         if(lsteventsairContacts.isEmpty() && lsteventsairContacts.isEmpty()) {
             //update offset in custom setting
@@ -491,21 +491,21 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
                     }
                 }
                 else{
-                   fname = ''; 
+                    fname = ''; 
                 }
                 if(streventconlname != null){
                     lname = streventconlname.trim(); 
                 }else{
-                   lname = 'UnKnown'; 
+                    lname = 'UnKnown'; 
                 }
-               if(streventconEmail != null){
+                if(streventconEmail != null){
                     email = streventconEmail.trim(); 
                 }else{
-                   email = ''; 
+                    email = ''; 
                 }
                 
                 string Finalstring = fname + lname + email;
-                 Finalstring = Finalstring.toLowerCase();
+                Finalstring = Finalstring.toLowerCase();
                 if(Finalstring != null && Finalstring != '') {
                     
                     if(mapofConEmailAndId.containsKey(Finalstring)) {
@@ -522,7 +522,7 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
                 if(eventregPaymentdetails.get('paymentStatus') != null) {
                     objreg.Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');                     
                 } 
-                 if(eventReg.get('checkInDate') != null) {
+                if(eventReg.get('checkInDate') != null) {
                     objreg.CheckInDate__c = (Datetime)eventReg.get('checkInDate');                     
                 }
                 if(eventReg.get('checkOutDate') != null) {
@@ -621,7 +621,7 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
                 // eventregtypemap = (Map<String, Object>)eventregtype; 
                 Object eventfunregtype = eventReg.get('feeType');                    
                 eventregtypemap = (Map<String, Object>)eventfunregtype;
-               String strRegTypeId = (String) eventregtypemap.get('id');
+                String strRegTypeId = (String) eventregtypemap.get('id');
                 //strRegTypeName = (String) eventregtypemap.get('Name');
                 
                 if(eventregtypemap != null && !setOfProdId.contains(strRegTypeId)) {
@@ -815,9 +815,9 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
                     Map<String, Object> eventregtypemap;
                     Map<String, Object> eventregPaydetailcodedetail;
                     string funregid = (String) eventReg.get('id');
-                      Object eventfunregtype = eventReg.get('feeType');                    
-                eventregtypemap = (Map<String, Object>)eventfunregtype;
-                String strRegTypeId = (String) eventregtypemap.get('id');
+                    Object eventfunregtype = eventReg.get('feeType');                    
+                    eventregtypemap = (Map<String, Object>)eventfunregtype;
+                    String strRegTypeId = (String) eventregtypemap.get('id');
                     System.debug('@@@ strRegTypeId = '+strRegTypeId);
                     Object eventregPaydetail = eventReg.get('paymentDetails');                    
                     eventregPaymentdetails = new Map<String, Object>();
@@ -927,8 +927,8 @@ return filteredContacts;
 }*/
     
     // method to insert new contacts(no duplicates) in salesforce
-   public static Map<String, Id> insertContactsIfNotExist(List<Contact> contactsToInsert) {
-         Set<String> setOfCombinedEventsAirAttendee = new Set<String>(); 
+    public static Map<String, Id> insertContactsIfNotExist(List<Contact> contactsToInsert) {
+        Set<String> setOfCombinedEventsAirAttendee = new Set<String>(); 
         
         //loop through Contact list to combined the attendee data        
         for(Contact objcontact: contactsToInsert) {
@@ -938,50 +938,50 @@ return filteredContacts;
             system.debug('@@setOfCombinedEventsAirAttendee - for new'+setOfCombinedEventsAirAttendee);
         }
         
-         //fetch existing Contacts based on Combined name and email
+        //fetch existing Contacts based on Combined name and email
         List<Contact> LstOfExtistingContact = [Select Id,FirstName, LastName,Email,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];
         Map<String, Id> mapOfContactStringAndId = new Map<String, Id>();
         
         //loop through existing Contacts and fill the map
         for(Contact objContact :LstOfExtistingContact){
-           mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id); 
+            mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id); 
         }
         system.debug('@@mapOfContactStringAndId'+mapOfContactStringAndId);
         List<Contact> ListOfContactToInsert = new List<Contact>();
-         List<Contact> FinalListOfContactToInsert = new List<Contact>();
+        List<Contact> FinalListOfContactToInsert = new List<Contact>();
         Set<String> setOfCurrentContactCombinedData = new Set<String>();
         
         for(Contact objcontact :contactsToInsert){
-             String strcombinedEventsAirAttendee= objcontact.FirstName+objcontact.LastName+objcontact.Email; 
+            String strcombinedEventsAirAttendee= objcontact.FirstName+objcontact.LastName+objcontact.Email; 
             strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
             
             //check if lead exist or not
             if(!mapOfContactStringAndId.ContainsKey(strcombinedEventsAirAttendee)){
                 // this is for check current batch duplicate data
                 if(!setOfCurrentContactCombinedData.contains(strcombinedEventsAirAttendee)){
-                     ListOfContactToInsert.add(objcontact);
+                    ListOfContactToInsert.add(objcontact);
                     setOfCurrentContactCombinedData.add(strcombinedEventsAirAttendee);
                 }
                 else{
                     system.debug('contact alreaded added');
                 }
-               
+                
             }else{
                 system.debug('contact already exist in Salesforce');
             }
         }
-       
+        
         for(Contact objcontact :ListOfContactToInsert){
             /*if(isValidEmail(objcontact.Email)) {
-                
-                system.debug('valid');
-                
-            }*/
+
+system.debug('valid');
+
+}*/
             FinalListOfContactToInsert.add(objcontact);
             
         }
         
-         if(FinalListOfContactToInsert.size()>0){
+        if(FinalListOfContactToInsert.size()>0){
             Database.insert(FinalListOfContactToInsert,false);
         }
         
@@ -992,10 +992,10 @@ return filteredContacts;
             mapOfContactStringAndId.put(objcontact.CombinedString__c, objcontact.Id); 
         }
         system.debug('@@mapOfContactStringAndId'+mapOfContactStringAndId);
-         system.debug('@@mapOfContactStringAndId - size'+mapOfContactStringAndId.size());
+        system.debug('@@mapOfContactStringAndId - size'+mapOfContactStringAndId.size());
         return mapOfContactStringAndId;
         
-       
+        
     }
     
     
@@ -1036,7 +1036,7 @@ return filteredContacts;
     }
     
     // method to insert new Leads(no duplicates) in salesforce
-   public static Map<String, Id> insertLeadsIfNotExist(List<Lead> leadsToInsert) {
+    public static Map<String, Id> insertLeadsIfNotExist(List<Lead> leadsToInsert) {
         
         
         Set<String> setOfCombinedEventsAirAttendee = new Set<String>();
@@ -1052,55 +1052,55 @@ return filteredContacts;
         system.debug('setOfCombinedEventsAirAttendee'+setOfCombinedEventsAirAttendee.size());
         //fetch existing leads based on Combined name and email
         List<Lead> LstOfExtistingLead = [Select Id,FirstName, LastName,Email,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
-         system.debug('@@LstOfExtistingLead'+LstOfExtistingLead);
+        system.debug('@@LstOfExtistingLead'+LstOfExtistingLead);
         system.debug('@@LstOfExtistingLead size '+LstOfExtistingLead.size());
         Map<String, Id> mapOfLeadStringAndId = new Map<String, Id>();
         
         //loop through existing leads and fill the map
         for(Lead objLead :LstOfExtistingLead){
-           mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
+            mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
         }
         system.debug('@@mapOfLeadStringAndId '+mapOfLeadStringAndId);
         List<Lead> ListOfLeadToInsert = new List<Lead>();
-         List<Lead> FinalListOfLeadToInsert = new List<Lead>();
+        List<Lead> FinalListOfLeadToInsert = new List<Lead>();
         Set<String> setOfCurrentleadCombinedData = new Set<String>();
         
         for(Lead objLead :leadsToInsert){
-             String strcombinedEventsAirAttendee= objLead.FirstName+objLead.LastName+objLead.Email; 
+            String strcombinedEventsAirAttendee= objLead.FirstName+objLead.LastName+objLead.Email; 
             strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
             system.debug('setOfCombinedEventsAirAttendee'+setOfCombinedEventsAirAttendee);
             //check if lead exist or not
             if(!mapOfLeadStringAndId.ContainsKey(strcombinedEventsAirAttendee)){
                 // this is for check current batch duplicate data
                 if(!setOfCurrentleadCombinedData.contains(strcombinedEventsAirAttendee)){
-                     ListOfLeadToInsert.add(objLead);
+                    ListOfLeadToInsert.add(objLead);
                     setOfCurrentleadCombinedData.add(strcombinedEventsAirAttendee);
                 }
                 else{
                     system.debug('Lead alreaded added');
                 }
-               
+                
             }else{
                 system.debug('Lead already exist in Salesforce');
             }
         }
-         system.debug('@@ListOfLeadToInsert-size'+ListOfLeadToInsert.size());
+        system.debug('@@ListOfLeadToInsert-size'+ListOfLeadToInsert.size());
         for(Lead objLead :ListOfLeadToInsert){
             FinalListOfLeadToInsert.add(objLead);
             /*if(isValidEmail(objLead.Email)) {
-                
-                system.debug('valid');
-                
-            }
-            else{
-                System.debug('not valid');
-            }*/
+
+system.debug('valid');
+
+}
+else{
+System.debug('not valid');
+}*/
             
         }
         
         
         if(FinalListOfLeadToInsert.size()>0){
-             system.debug('@@FinalListOfLeadToInsert-size'+FinalListOfLeadToInsert.size());
+            system.debug('@@FinalListOfLeadToInsert-size'+FinalListOfLeadToInsert.size());
             database.insert(FinalListOfLeadToInsert,false);
             system.debug('@@FinalListOfLeadToInsert'+FinalListOfLeadToInsert);
             //insert FinalListOfLeadToInsert;
@@ -1116,11 +1116,11 @@ return filteredContacts;
         system.debug('@@mapOfLeadStringAndId'+mapOfLeadStringAndId);
         system.debug('@@mapOfLeadStringAndId - size'+mapOfLeadStringAndId.size());
         return mapOfLeadStringAndId;
-       
+        
     }
     
     // method to insert new Registration__c(no duplicates) in salesforce
-  public void insertRegistrationIfNotExist(List<Registration__c> lstInsrtReg) {
+    public void insertRegistrationIfNotExist(List<Registration__c> lstInsrtReg) {
         system.debug('insertRegistrationIfNotExist'+lstInsrtReg.size());
         Map<String, Id> mapOfEvnRegIdandSfRegId = new Map<String, Id>();
         set<String> setOfEvnRegIds = new set<String>();
@@ -1357,24 +1357,24 @@ return filteredLads;
             
         }
         //get function details from function registration code end
-     /*   if(!lstInsrtFun.isEmpty()) {
-            
-            for(Function__c fun :lstInsrtFun)
-                if(!mapOfExistingFunction.containsKey(fun.EventsAir_ID__c)){
-                    ListToFinalInsert.add(fun);
-                }            
-        }
-        if(!ListToFinalInsert.isEmpty()) {
-            insert ListToFinalInsert;
-        }*/
-        if(!lstInsrtFun.isEmpty()) {
-Database.upsert(lstInsrtFun, Function__c.Fields.EventsAir_ID__c, true);            
+        /*   if(!lstInsrtFun.isEmpty()) {
+
+for(Function__c fun :lstInsrtFun)
+if(!mapOfExistingFunction.containsKey(fun.EventsAir_ID__c)){
+ListToFinalInsert.add(fun);
+}            
 }
-     }
+if(!ListToFinalInsert.isEmpty()) {
+insert ListToFinalInsert;
+}*/
+        if(!lstInsrtFun.isEmpty()) {
+            Database.upsert(lstInsrtFun, Function__c.Fields.EventsAir_ID__c, true);            
+        }
+    }
     
     public void finish(Database.BatchableContext BC) {
-	
-	 if(!test.isrunningtest()) {
+        
+        if(!test.isrunningtest()) {
             List<Manage_Eventsair_Fun_Reg_Apex_batch__c> lstcustsett2 = [SELECT Id, Name, Offset__c, Is_Execute_Next__c 
                                                                          FROM Manage_Eventsair_Fun_Reg_Apex_batch__c LIMIT 1];            
             // Your finish logic goes here
