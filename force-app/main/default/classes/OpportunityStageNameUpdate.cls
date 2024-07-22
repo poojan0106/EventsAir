@@ -13,15 +13,32 @@ public class OpportunityStageNameUpdate {
                 break;
             } 
         }
-
+        
         if (!hasRecords) {
             System.debug('All provided record ID lists are empty.');
             return recordIdCollections;
+        }else{
+            Set<Id> allRecordIds = new Set<Id>();
+            
+            for (List<Id> recordIds : recordIdCollections) {
+                allRecordIds.addAll(recordIds);
+            }
+            
+            if(!allRecordIds.isEmpty()){
+                List<Opportunity> opportunitiesToUpdate = new List<Opportunity>();
+                for(Opportunity opp : [SELECT Id, StageName FROM Opportunity WHERE Id IN :allRecordIds]){
+                    opp.StageName = 'Closed Won';
+                    opportunitiesToUpdate.add(opp);
+                }
+                try{
+                    Database.update(opportunitiesToUpdate, true);
+                }catch(Exception e){
+                    system.debug(e);
+                }
+            }
+            
         }
-
-        OpportunityStageNameUpdateBatch batch = new OpportunityStageNameUpdateBatch(recordIdCollections);
-        Database.executeBatch(batch, 10);
-
+        
         return recordIdCollections;
     }
 }

@@ -7,7 +7,7 @@ public class ImportRegistartionControllerTest {
         
 		 Test.setMock(HttpCalloutMock.class, setStaticMock('importregistrationMock'));
        
-        Event__c testEvent = new Event__c(Name = 'Test Event', EventsAirID__c = '12345',Event_Portfolio__c = 'Food',Event_Category__c = 'Naturally Good' );
+        Event__c testEvent = new Event__c(Name = 'Test Event', EventsAirID__c = '12345',Event_Portfolio__c = 'Food',Event_Category__c = 'Naturally Good',Is_Pricebook_Created__c=false );
         system.debug('testEvent'+testEvent);
         insert testEvent;
         
@@ -78,13 +78,30 @@ update standardPricebook;
         ApexPages.StandardController controller = new ApexPages.StandardController(testEvent);
 
         ImportRegistartionController controllerInstance = new ImportRegistartionController(controller);
-        Database.executeBatch(new ForamTestbatch(testEvent.EventsAirID__c, testEvent.Id), 100);
+        Database.executeBatch(new ImportRegistartionFromEventsAirBatch(testEvent.EventsAirID__c, testEvent.Id), 100);
         
        
         Test.startTest();
         
         PageReference resultPage = controllerInstance.executeBatch();
         Test.stopTest();
+  }
+  static testMethod void testAuthentication(){
+    Test.setMock(HttpCalloutMock.class, new MockHttpResponse());  
+    Token_Request_Information__c customSetting = new Token_Request_Information__c(
+            Name = 'AccessToken Information',
+            EndPoint__c = 'https://example.com/token',
+            Grant_Type__c = 'client_credentials',
+            Scope__c = 'some_scope',
+            Client_Id__c = 'client_id',
+            Client_Secret__c = 'client_secret'
+        );
+        insert customSetting;
+
+    Test.startTest();
+    String accessToken = EventsAirOAuthTokenRequest.getAccessToken('trade');
+    Test.stopTest();
+
   }
     
     public static StaticResourceCalloutMock setStaticMock (String mockName) {
@@ -94,5 +111,14 @@ update standardPricebook;
         mock.setStatusCode(200);
         mock.setHeader('Content-Type', 'application/json');
         return mock;
+    }
+    private class MockHttpResponse implements HttpCalloutMock {
+        public HTTPResponse respond(HTTPRequest req) {
+            HttpResponse res = new HttpResponse();
+            res.setHeader('Content-Type', 'application/json');
+            res.setBody('{"access_token":"mock_access_token"}');
+            res.setStatusCode(200);
+            return res;
+        }
     }
 }

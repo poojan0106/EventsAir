@@ -36,11 +36,12 @@ public class ForamTestbatch implements Database.Batchable<ResponseWrapper>, Data
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
         
         System.debug('%%% strEventId = '+strEventId);
+        List<Event__c> eventData = [Select Id,Name,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
+        String RecordType = eventData[0].RecordType.Name;
         System.debug('%%% lstcustsett[0].Offset__c = '+lstcustsett[0].Offset__c);
         //get access token
-        String strtoken = EventsAirOAuthTokenRequest.getAccessToken();
+        String strtoken = EventsAirOAuthTokenRequest.getAccessToken(RecordType);
         
-        //Prepare API Query        
         String graphqlQuery = '{' +
             '"query": "query GetEventData($eventId: ID!, $contactsLimit: PaginationLimit!, $conoffset: NonNegativeInt!, $regLimit: PaginationLimit!,) {' +
             'event(id: $eventId) {' +

@@ -979,7 +979,7 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
        
     }
     
-    public static Boolean isValidEmail(String email) {
+   /* public static Boolean isValidEmail(String email) {
 
         // Regular expression pattern for email validation
 
@@ -1013,7 +1013,7 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
 
         
 
-    }
+    } */
     
     // to insert only new Leads if not exist in salesforce
     public static Map<String, Id> insertLeadsIfNotExist(List<Lead> leadsToInsert) {

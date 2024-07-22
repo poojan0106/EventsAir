@@ -8,16 +8,9 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     
     List<Contact> lstInsrtCon;
     List<Lead> lstInsrtLead;    
-    List<Function__c> lstInsrtFun;        
     Map<String, Id> mapofConEmailAndId = new Map<String, Id>();
     Map<String, Id> mapofLeadEmailAndId = new Map<String, Id>();
-       Map<String, Id> mapOfEvnproandSfId = new Map<String, Id>();
-    Map<String, Id> mapOfEventregTypeAndSFproId = new Map<String, Id>();
-    Set<String> setofProductId = new Set<String>();
-    Map<String, Id> mapOfEventRegTypeIdAndSFPBentryId = new Map<String, Id>();
-    Map<String, Decimal> mapOfEventRegTypeIdAndSFPBentryPrice = new Map<String, Decimal>();
     Map<String, String> selectedValuesMap = new Map<String, String>();
-    Map<String, Id> mapOfRecTypeAndProduct = new Map<String, Id>();
 
     //fetch current offset value from custom setting
     List<Manage_Eventsair_Reg_Apex_batch__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c 
@@ -144,10 +137,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 selectedValuesMap.put(value, value);
             }
         }
-        List<product2> sfProductList = [SELECT Id,Events__c  ,Events__r.Id, name from product2 where Events__r.Id =:sfeventId];
-        for(product2 prod: sfProductList){
-            mapOfRecTypeAndProduct.put(prod.Name ,prod.Id);
-        }
+
         String serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
         Map<String, Object> jsonResponse = (Map<String, Object>) JSON.deserializeUntyped(serializedResponseWrapper);
         Map<String, Object> eventDatamap = (Map<String, Object>) jsonResponse.get('data');        
@@ -306,35 +296,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone;
                 if(eventconphonemap != null) {
                     objcon.MobilePhone = (String) eventconphonemap.get('mobile');
-                } 
-               /*
-                Object eventconadress = eventconmap.get('primaryAddress');
-                Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
-                if(eventconAdressmap != null) {
-                    if(eventconAdressmap.get('city') != null){
-                        objcon.MailingCity = (String) eventconAdressmap.get('city');  
-                    }
-                    
-                    if(eventconAdressmap.get('country') != null){
-                        objcon.MailingCountry = (String) eventconAdressmap.get('country');
-                    }
-                    
-                    if(eventconAdressmap.get('line1') != null && eventconAdressmap.get('line2') != null  && eventconAdressmap.get('line3') != null){
-                        objcon.MailingStreet = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
-                        
-                    }
-                    if(eventconAdressmap.get('state') != null){
-                        objcon.MailingState = (String) eventconAdressmap.get('state'); 
-                    }
-                    if(eventconAdressmap.get('postCode') != null){
-                        String strPostalcode = (String) eventconAdressmap.get('postCode');                    
-                        // Store only the first 20 characters in the mailingpostalcode field
-                        objcon.MailingPostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
-                        
-                    }
-                    
-                    
-                }*/   
+                }  
                 lstInsrtCon.add(objcon);
             }
             else {                
@@ -373,39 +335,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone; 
                 if(eventconphonemap != null) {
                     newLead.MobilePhone = (String) eventconphonemap.get('mobile'); 
-                }  
-                
-                /*Object eventleadadress = eventconmap.get('primaryAddress');
-                Map<String, Object> eventleadAdressmap = (Map<String, Object>) eventleadadress;
-                
-                if(eventleadAdressmap != null) {
-                    if(eventleadAdressmap.get('city') != null){
-                        newLead.City = (String) eventleadAdressmap.get('city');  
-                    }
-                    
-                    if(eventleadAdressmap.get('country') != null){
-                        newLead.Country = (String) eventleadAdressmap.get('country');
-                        
-                    }
-                    if(eventleadAdressmap.get('line1') != null && eventleadAdressmap.get('line2') != null && eventleadAdressmap.get('line3') != null){
-                        newLead.Street = (String) eventleadAdressmap.get('line1')+ ' '+(String) eventleadAdressmap.get('line2')+' '+(String) eventleadAdressmap.get('line3');
-                        
-                    }
-                    if(eventleadAdressmap.get('state') != null){
-                        
-                        String strState = (String) eventleadAdressmap.get('state');  
-                        // Store only the first 80 characters in the state field
-                        newLead.State = strState != null ? strState.left(80) : null; 
-                    }
-                    
-                    if(eventleadAdressmap.get('postCode') != null){
-                        String strPostalcode = (String) eventleadAdressmap.get('postCode'); 
-                        // Store only the first 20 characters in the mailingpostalcode field
-                        newLead.PostalCode = strPostalcode != null ? strPostalcode.left(20) : null; 
-                        
-                    }
-                    
-                }    */              
+                }            
                 String strOrganization = (String) eventconmap.get('organizationName');
                 if(strOrganization != null && strOrganization != '') {
                     newLead.Company = strOrganization;
@@ -431,9 +361,6 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         }
         
         List<Registration__c> lstInsrtReg = new List<Registration__c>(); 
-        List<Opportunity> lstInsrtOpp = new List<Opportunity>();        
-        List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId];
-        Pricebook2 standardPriceBook = [ SELECT Id FROM Pricebook2 WHERE isStandard = true LIMIT 1];
         
         // Loop through event's air contacts data to create registration
         for(Object objeventcon : lsteventsairContacts) {
@@ -502,9 +429,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 }else{
                    email = ''; 
                 }
-                
-                
-                
+
                 string Finalstring = fname + lname + email;
                 Finalstring = Finalstring.toLowerCase();
                 if(Finalstring != null && Finalstring != '') {
@@ -518,9 +443,9 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 
                 Map<String, Object> eventregtype = (Map<String, Object>) eventReg.get('type');
                 if(eventregtype.get('name') != null) {
-                    if(!Test.isRunningTest()) {
+                    
                         objreg.Registration_Type__c = (String) eventregtype.get('name');
-                    }
+                    
                 }
                 
                 if(eventregPaymentdetails.get('paymentStatus') != null) {
@@ -534,338 +459,12 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                     lstInsrtReg.add(objreg);
                 }
                 	system.debug('totalcharge'+totalcharge);
-                  if(totalcharge > 0 && isexecuted == false) {
-                    if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
-                        
-                        isexecuted = true;
-                        system.debug('totalcharge'+totalcharge);
-                        system.debug('eventconmap.get(firstName)'+eventconmap.get('firstName'));
-                        system.debug('eventconmap.get(lastName)'+eventconmap.get('lastName'));
-                        //Opportunity field Mapping start
-                        Opportunity objOpp = new Opportunity();
-                        String strOppName = 'Opportunity created for '+(String) eventconmap.get('firstName')+' '+(String) eventconmap.get('lastName');
-                        objOpp.Name = strOppName;
-                        objOpp.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-                        
-                        if(mapOfDomainNameAndAccOwnerId.containsKey(strAccdomainname)){
-                            objOpp.OwnerId = mapOfDomainNameAndAccOwnerId.get(strAccdomainname);
-                        }
-                        
-                        objOpp.Is_Private__c = false;	
-                        objOpp.LeadSource = 'EventsAir';
-                        objOpp.Closedate = System.today();
-                        objOpp.RecordTypeId = Schema.SObjectType.Opportunity.getRecordTypeInfosByDeveloperName().get('Divcom_Visitor').getRecordTypeId();
-                        objOpp.Event__c = sfeventId;
-                        objOpp.EventsAir_Contact_Id__c = strevntconId;
-                        if(lstPriceook.size() > 0) {
-                            objOpp.Pricebook2Id =lstPriceook[0].Id;
-                        }                        
-                        objOpp.stageName = 'Closed Won'; 
-                        
-                        objOpp.NetSuite_Integration_Status__c = 'DoNotSync';
-                        lstInsrtOpp.add(objOpp); 
-                        System.debug('objOpp '+objOpp);                    
-                    } 
-                }
             }
         }
         
         insertRegistrationIfNotExist(lstInsrtReg);
-        insertOpportunityIfNotExist(lstInsrtOpp);
-        createOpportunityProduct(lsteventsairContacts, lstInsrtOpp);
-        
     }
-    
-     public void createOpportunityProduct(List<Object> lsteventsairContacts,List<Opportunity> lstInsrtOpp) {
-        
-        List<OpportunityLineItem> lstInsertOppProduct = new List<OpportunityLineItem>();
-        Set<String> setOfProdId = new Set<String>();
-        List<Product2> lstInsertproduct = new List<Product2>();
-        List<PricebookEntry> lstInsertPricebookEntry = new  List<PricebookEntry>(); 
-        Map<String, Id> mapOfEventConAndSFOppId = new Map<String, Id>();
-       Map<String, Object> eventregPaymentdetailsOli;
-       
-        String strtickets;
-        //String strRegTypeId;
-        //ring strevntconId;
-        
-        //fetch pricebook
-        List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId];
-        Pricebook2 standardPriceBook = [ SELECT Id FROM Pricebook2 WHERE isStandard = true LIMIT 1];
-        
-        List<Opportunity> lstofOpportunity = [select id,Name,CreatedDate,EventsAir_Contact_Id__c from Opportunity where id in :lstInsrtOpp];
-        
-        for(Opportunity opp: lstofOpportunity) {
-            mapOfEventConAndSFOppId.put(opp.EventsAir_Contact_Id__c, opp.Id);
-            system.debug('mapOfEventConAndSFOppId'+mapOfEventConAndSFOppId);
-        }
-        
-        
-        
-        for(Object objeventcon: lsteventsairContacts) {
-            
-            Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;  
-            
-            List<Object> lsteventsairRegistrations = (List<Object>) eventconmap.get('registrations');
-            String strevntconId = (String) eventconmap.get('id'); 
-            System.debug('@@@ lsteventsairRegistrations = '+lsteventsairRegistrations);
-            
-            //loop through event'sair registration data
-            for(Object objEventReg: lsteventsairRegistrations) {
-                //Registartion field mapping start
-                Map<String, Object> eventReg = (Map<String, Object>)objEventReg;
-                
-                Map<String, Object> eventregtypemap;
-                List<Object> lstfee;
-                string funregid = (String) eventReg.get('id');
-                 Map<String, Object> eventregPaymentdetails = (Map<String, Object>) eventReg.get('paymentDetails');
-                Decimal totalcharge = (Decimal) eventregPaymentdetails.get('totalChargeAmount');
-                 Object eventregtype = eventReg.get('type');                    
-                 eventregtypemap = (Map<String, Object>)eventregtype; 
-                
-                
-               String strRegTypeId = (String) eventregtypemap.get('id');
-                
-                
-            }            
-        }
-        
-        
-        
-        for(Object objeventcon: lsteventsairContacts) {
-            
-            Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;  
-            
-            List<Object> lsteventsairRegistrations = (List<Object>) eventconmap.get('registrations');
-            String strevntconId = (String) eventconmap.get('id'); 
-            System.debug('@@@ lsteventsairRegistrations = '+lsteventsairRegistrations);
-            
-            //loop through event'sair registration data
-            for(Object objEventReg: lsteventsairRegistrations) {
-                //Registartion field mapping start
-                Map<String, Object> eventReg = (Map<String, Object>)objEventReg;
-                
-                Map<String, Object> eventregtypemap;
-                List<Object> lstfee;
-                string funregid = (String) eventReg.get('id');
-                 Map<String, Object> eventregPaymentdetails = (Map<String, Object>) eventReg.get('paymentDetails');
-                Decimal totalcharge = (Decimal) eventregPaymentdetails.get('totalChargeAmount');
 
-                
-                Object eventfunregtype = eventReg.get('type');        
-                System.debug(eventfunregtype);       
-                eventregtypemap = (Map<String, Object>)eventfunregtype;
-                String strRegTypeId = (String) eventregtypemap.get('id');
-                String strRegTypeName = (String) eventregtypemap.get('name');
-
-                List<Map<String, Object>> listOfFunFeetypemap = new List<Map<String, Object>>();
-                lstfee = (List<Object>) eventregtypemap.get('fees'); 
-                
-                for(Object objfee: lstfee) {
-                    
-                    Map<String, Object> feemap = (Map<String, Object>)objfee;
-                    
-                    if(totalcharge>0 && mapOfRecTypeAndProduct.containsKey(strRegTypeName) && !setofProductId.contains(strRegTypeId)) {
-                        system.debug(' pricebook');
-                        //add to standard pricebook
-                        PricebookEntry pbEntry = new PricebookEntry();
-                        pbEntry.Product2Id = mapOfRecTypeAndProduct.get(strRegTypeName);   
-                        if(standardPriceBook != null){
-                            pbEntry.Pricebook2Id = standardPriceBook.Id;  
-                        }
-                        
-                        pbEntry.UnitPrice = (decimal) feemap.get('amount');
-                        pbEntry.IsActive = true;
-                        pbEntry.UseStandardPrice = false;
-                        system.debug(' pricebook'+pbEntry);
-                        lstInsertPricebookEntry.add(pbEntry); 
-                        
-                        //add to custom pricebook
-                        PricebookEntry pbEntry2 = new PricebookEntry();
-                        system.debug(' mapOfEvnproandSfId'+mapOfEvnproandSfId);
-                        system.debug(' strRegTypeId'+strRegTypeName);
-                        if(mapOfRecTypeAndProduct.containsKey(strRegTypeName)){
-                            system.debug(' inside');
-                            pbEntry2.Product2Id = mapOfRecTypeAndProduct.get(strRegTypeName);                         
-                        }
-                        if(lstPriceook.size()>0){
-                            pbEntry2.Pricebook2Id = lstPriceook[0].Id; 
-                        }         
-                        if(strRegTypeId != null) {
-                            pbEntry2.EventsAir_Type_ID__c = strRegTypeId;
-                        }  
-                        pbEntry2.UnitPrice = (decimal) feemap.get('amount');
-                        pbEntry2.IsActive = true;
-                        pbEntry2.UseStandardPrice = false;
-                        setofProductId.add(strRegTypeId);
-                        lstInsertPricebookEntry.add(pbEntry2);                        
-                    }                    
-                }
-                
-            }            
-        }
-        
-        //create pricebbook entry
-        if(!lstInsertPricebookEntry.isEmpty()) {
-            
-            //check for existing pricebookentry start
-            Set<String> setOfPricebookProductIds = new Set<String>();
-            for (PricebookEntry newpricebookentry : lstInsertPricebookEntry) {
-                setOfPricebookProductIds.add(newpricebookentry.Product2Id);
-            }
-            List<PricebookEntry> lstexistingPricebookentry = [SELECT Id, Name, Product2.Name, EventsAir_Type_ID__c, UnitPrice
-                                                              FROM PricebookEntry 
-                                                              WHERE Product2Id IN: setOfPricebookProductIds];
-            
-            Map<String, Boolean> mapofpricebookentry = new Map<String, Boolean>();
-            
-            for(PricebookEntry pb: lstexistingPricebookentry) {
-                mapofpricebookentry.put(pb.Product2Id, true);
-            }
-            
-            List<PricebookEntry> finallsttoinsrtPB = new List<PricebookEntry>();
-            
-            for(PricebookEntry objPB: lstInsertPricebookEntry) {
-                if(!mapofpricebookentry.containsKey(objPB.Product2Id)) {
-                    finallsttoinsrtPB.add(objPB);
-                }
-            }
-            //check for existing pricebookentry end
-            
-            if(!finallsttoinsrtPB.isEmpty()) {
-                insert finallsttoinsrtPB;
-            }
-            
-            //fill mapOfEventRegTypeIdAndSFPBentryId Map
-            //loop through existing pricebookentry list
-            for(PricebookEntry objexistingPBEntry: lstexistingPricebookentry) {
-                mapOfEventRegTypeIdAndSFPBentryId.put(objexistingPBEntry.EventsAir_Type_ID__c, objexistingPBEntry.Id);
-                mapOfEventRegTypeIdAndSFPBentryPrice.put(objexistingPBEntry.EventsAir_Type_ID__c, objexistingPBEntry.UnitPrice);                        
-            }
-            
-            //loop through new pricebookentry list
-            for(PricebookEntry objnewPBEntry: finallsttoinsrtPB) {
-                mapOfEventRegTypeIdAndSFPBentryId.put(objnewPBEntry.EventsAir_Type_ID__c, objnewPBEntry.Id);
-                mapOfEventRegTypeIdAndSFPBentryPrice.put(objnewPBEntry.EventsAir_Type_ID__c, objnewPBEntry.UnitPrice);
-            }
-            
-        }  
-        
-        for(Object objeventcon: lsteventsairContacts) {
-            
-            Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;  
-            
-            List<Object> lsteventsairRegistrations = (List<Object>) eventconmap.get('registrations');
-            String strevntconId = (String) eventconmap.get('id'); 
-            System.debug('@@@ lsteventsairRegistrations = '+lsteventsairRegistrations);
-            if(lsteventsairRegistrations.size()>0){
-                //loop through event'sair registration data
-                for(Object objEventReg: lsteventsairRegistrations) {
-                    //Registartion field mapping start
-                    Map<String, Object> eventReg = (Map<String, Object>)objEventReg;
-                    String discountcodeval;
-                    Map<String, Object> eventregtypemap;
-                    Map<String, Object> eventregPaydetailcodedetail;
-                    string funregid = (String) eventReg.get('id');
-                      Object eventfunregtype = eventReg.get('type');                    
-                eventregtypemap = (Map<String, Object>)eventfunregtype;
-                String strRegTypeId = (String) eventregtypemap.get('id');
-                String strRegTypeName = (String) eventregtypemap.get('name');
-                    System.debug('@@@ strRegTypeId = '+strRegTypeId);
-                    Object eventregPaydetail = eventReg.get('paymentDetails');                    
-                    eventregPaymentdetailsOli = new Map<String, Object>();
-                    eventregPaymentdetailsOli = (Map<String, Object>)eventregPaydetail;
-                    Decimal totalcharge = (Decimal)eventregPaymentdetailsOli.get('totalChargeAmount');
-                    
-                    if(eventregPaymentdetailsOli.get('discountCode') != null){
-                        Object eventregPaydetailcode = eventregPaymentdetailsOli.get('discountCode');
-                        eventregPaydetailcodedetail = (Map<String, Object>)eventregPaydetailcode;
-                        system.debug('eventregPaydetailcodedetail'+eventregPaydetailcodedetail);
-                        system.debug('eventregPaydetailcodedetail.get'+eventregPaydetailcodedetail.get('code'));
-                        if(eventregPaydetailcodedetail.get('code') != null){
-                            discountcodeval = (String)eventregPaydetailcodedetail.get('code');
-                        } 
-                    }
-                    
-                    
-                    
-                    
-                    
-                    // system.debug('totalcharge'+totalcharge);
-                    
-                    if(totalcharge > 0){
-                        //OpportunityLineItem field mapping start
-                        system.debug('totalcharge'+totalcharge);
-                        if( mapOfEventConAndSFOppId.containsKey(strevntconId)  && mapOfEventRegTypeIdAndSFPBentryId.containskey(strRegTypeId)) {
-                            OpportunityLineItem oli = new OpportunityLineItem();
-                            system.debug('mapOfEventConAndSFOppId.get(strevntconId)'+mapOfEventConAndSFOppId.get(strevntconId)+' '+strevntconId);
-                            system.debug(' mapOfEventRegTypeIdAndSFPBentryId.get(strRegTypeId)'+ mapOfEventRegTypeIdAndSFPBentryId.get(strRegTypeId));
-                            oli.OpportunityId = mapOfEventConAndSFOppId.get(strevntconId);                    
-                            oli.PricebookEntryId = mapOfEventRegTypeIdAndSFPBentryId.get(strRegTypeId);
-                            oli.Quantity = 1;
-                            oli.Product2Id =mapOfRecTypeAndProduct.get(strRegTypeName); 
-                            oli.EventsAir_Adjustment__c = (Decimal) eventregPaymentdetailsOli.get('adjustmentAmount');
-                            oli.EventsAir_Discount_Amount__c = (Decimal) eventregPaymentdetailsOli.get('discountAmount');
-                            if(discountcodeval != null){
-                                oli.EventsAir_Discount_Code__c = discountcodeval;  
-                            }
-                            System.debug('@@@ eventregPaymentdetailsOli = '+eventregPaymentdetailsOli);
-                            System.debug('@@@ eventregPaymentdetailsOli ='+eventregPaymentdetailsOli.get('taxAmount') );
-                            oli.EventsAir_Tax__c = (Decimal) eventregPaymentdetailsOli.get('taxAmount');
-                            oli.EventsAir_Payment_Status__c = (String) eventregPaymentdetailsOli.get('paymentStatus');
-                            oli.Function_Registration_Id__c = funregid;
-                            oli.TotalPrice = (Decimal) eventregPaymentdetailsOli.get('totalChargeAmount');
-                            /* if(mapOfEventRegTypeIdAndSFPBentryPrice.containskey(strRegTypeId)) {
-oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strRegTypeId));   
-} */
-                            system.debug('oli'+oli);
-                            lstInsertOppProduct.add(oli);
-                        }
-                    }
-                }
-            }
-        }
-        
-        if(!lstInsertOppProduct.isEmpty()) {
-            //Database.upsert(lstInsertOppProduct, OpportunityLineItem.Function_Registration_Id__c, false);
-            
-            Map<String, Id> mapOfEvnOLIandSfId = new Map<String, Id>();
-            set<String> setOfEvnOLIIds = new set<String>();
-            
-            for(OpportunityLineItem oli: lstInsertOppProduct) {
-                setOfEvnOLIIds.add(oli.Function_Registration_Id__c);
-            }
-            
-            //do soql on con to fetch data based on eventsair contact id
-            List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c
-                                                         FROM OpportunityLineItem 
-                                                         WHERE Function_Registration_Id__c IN: setOfEvnOLIIds];
-            
-            if(lstexistingOlis.size() > 0) {
-                for(OpportunityLineItem existingoli: lstexistingOlis) {
-                    mapOfEvnOLIandSfId.put(existingoli.Function_Registration_Id__c, existingoli.Id);
-                }
-            }
-            
-            List<OpportunityLineItem> finallisttoinsertoli= new List<OpportunityLineItem>();
-            
-            for(OpportunityLineItem newoli: lstInsertOppProduct) {
-                if(!mapOfEvnOLIandSfId.containskey(newoli.Function_Registration_Id__c)) {
-                    finallisttoinsertoli.add(newoli);
-                }
-            }
-            
-            if(finallisttoinsertoli.size() >0) {
-                system.debug('Oli'+finallisttoinsertoli.size());
-                insert finallisttoinsertoli;
-            }
-        }
-        
-      
-        
-    }
-    
-    
     // to insert only new Contacts if not exist in salesforce
     public static Map<String, Id> insertContactsIfNotExist(List<Contact> contactsToInsert) {
          Set<String> setOfCombinedEventsAirAttendee = new Set<String>(); 
@@ -912,11 +511,6 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
         }
        
         for(Contact objcontact :ListOfContactToInsert){
-            /*if(isValidEmail(objcontact.Email)) {
-                
-                system.debug('valid');
-                
-            }*/
             FinalListOfContactToInsert.add(objcontact);
             
         }
@@ -936,42 +530,6 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
         return mapOfContactStringAndId;
         
        
-    }
-    
-    public static Boolean isValidEmail(String email) {
-
-        // Regular expression pattern for email validation
-
-        String emailRegex = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$';
-
-        
-
-        // Compile the pattern
-
-        Pattern pattern = Pattern.compile(emailRegex);
-
-        boolean returnval =  false;
-
-        // Match the email against the pattern
-
-        if(email != null && email !=''){
-
-            Matcher matcher = pattern.matcher(email);
-
-            returnval =  matcher.matches();
-
-        }else if(email == null){
-
-            returnval = true;
-
-        }
-
-        return returnval;
-
-        // Return true if email matches the pattern, false otherwise
-
-        
-
     }
     
     // to insert only new Leads if not exist in salesforce
@@ -1026,15 +584,6 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
          system.debug('@@ListOfLeadToInsert-size'+ListOfLeadToInsert.size());
         for(Lead objLead :ListOfLeadToInsert){
             FinalListOfLeadToInsert.add(objLead);
-            /*if(isValidEmail(objLead.Email)) {
-                
-                system.debug('valid');
-                
-            }
-            else{
-                System.debug('not valid');
-            }*/
-            
         }
         
         
@@ -1093,44 +642,6 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
         }
         
     }
-    
-     // method to insert new Opportunity(no duplicates) in salesforce
-    public void insertOpportunityIfNotExist(List<Opportunity> lstInsrtOpp) {
-        
-        Map<String, Id> mapOfEvnconIdandSfOppId = new Map<String, Id>();
-        set<String> setOfEvnconIds = new set<String>();
-        
-        for(Opportunity opp: lstInsrtOpp) {
-            setOfEvnconIds.add(opp.EventsAir_Contact_Id__c);
-        }
-        
-        //do soql on opportunity to fetch data based on eventsair contact id
-        List<Opportunity> lstexistingOpps = [SELECT Id, EventsAir_Contact_Id__c
-                                             FROM Opportunity 
-                                             WHERE EventsAir_Contact_Id__c IN: setOfEvnconIds];
-        
-        if(lstexistingOpps.size() > 0) {
-            for(Opportunity existingOpp: lstexistingOpps) {
-                mapOfEvnconIdandSfOppId.put(existingOpp.EventsAir_Contact_Id__c, existingOpp.Id);
-            }
-        }
-        
-        List<Opportunity> finallisttoinsertOpp = new List<Opportunity>();
-        
-        for(Opportunity newopp: lstInsrtOpp) {
-            if(!mapOfEvnconIdandSfOppId.containskey(newopp.EventsAir_Contact_Id__c)) {
-                finallisttoinsertOpp.add(newopp);
-            }
-        }
-        
-        if(finallisttoinsertOpp.size() >0) {
-            insert finallisttoinsertOpp;
-        }
-        for(Opportunity newopp: finallisttoinsertOpp) {
-            mapOfEvnconIdandSfOppId.put(newopp.EventsAir_Contact_Id__c, newopp.Id);
-        }
-    }
-    
     
     public void finish(Database.BatchableContext BC) {
         
