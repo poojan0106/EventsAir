@@ -1,11 +1,11 @@
 /*************************
-* Created By : Foram 
-* Cereated Date : 12-01-2024
+* Created By : Vandana 
+* Cereated Date : -07-2024
 * Description : Import Function Registration from Evntsair and 
 Create Contact/Lead, Registartion, Opportunity and Opportunity Products 
 **************************/
 
-public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batchable<ResponseWrapper>, Database.AllowsCallouts {
+public class ImportFunRegBatchForLiveEvent implements Database.Batchable<ResponseWrapper>, Database.AllowsCallouts {
     
     //variable declartion
     public String strEventId;
@@ -30,11 +30,15 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     //fetch current offset value from custom setting
     List<Manage_Eventsair_Fun_Reg_Apex_batch__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c 
                                                                 from Manage_Eventsair_Fun_Reg_Apex_batch__c LIMIT 1];
-    public ImportFuncRegistartionFromEventsAirBatch(String eventId, String strsfeventId) {
-        // List<Event__c> lstEvent = [Select Id, EventsAirID__c from Event__c where Batch_Execution_Time__c != null Limit 1];
+    public ImportFunRegBatchForLiveEvent() {
+        Date todayDate = Date.today();
+        List<Event__c> lstEvent = [SELECT Id, EventsAirID__c, Close_Date__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate and Registration_Types__c = null
+                                   and EventsAirID__c != null and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
         
-        strEventId = eventId;
-        sfeventId = strsfeventId;     
+        for(Event__c evnt: lstEvent) {
+            sfeventId = evnt.Id;
+            strEventId = evnt.EventsAirID__c;
+        } 
     }
     
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
@@ -861,7 +865,7 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
                             oli.EventsAir_Tax__c = (Decimal) eventregPaymentdetails.get('taxAmount');
                             oli.EventsAir_Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');
                             oli.Function_Registration_Id__c = funregid;
-                            oli.EventsAir_Regisration_ID__c = funregid;
+                             oli.EventsAir_Regisration_ID__c = funregid;
                             oli.TotalPrice = (Decimal) eventregPaymentdetails.get('totalChargeAmount');
                             /* if(mapOfEventRegTypeIdAndSFPBentryPrice.containskey(strRegTypeId)) {
 oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strRegTypeId));   
@@ -911,7 +915,8 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
         }
         
     }
-     public static void UpdateRegistrationsOLI(List<OpportunityLineItem> finallisttoinsertoli){
+    
+    public static void UpdateRegistrationsOLI(List<OpportunityLineItem> finallisttoinsertoli){
         system.debug(finallisttoinsertoli);
         List<string> LstOfEventsairRegId = new List<string>(); 
         Map<string,Id> MapOfEventsairRegIdandOLI = new Map<string,Id>();
@@ -931,6 +936,7 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
         Database.update(lstOfRegistrationtoLink,false);
         
     }
+    
     
     // commented by Vandana 5/4/24 as this method is not used anywhere
     /* public static List<Contact> removeContactsDuplicates(List<Contact> contactList) {
@@ -1255,31 +1261,7 @@ System.debug('not valid');
         }
     }
     
-    // method to generate  key string(Firstname + Lastname + Email)
-    public static string generatestringMethod(string FName, String LName , String email){
-        
-        string firstName;
-        string lastName;
-        string eemail;
-        string Finalstring;
-        
-        if(FName != null){
-            firstName = FName.trim(); 
-        }
-        
-        if(LName != null){
-            lastName = LName.trim();  
-        }
-        
-        if(email != null){
-            eemail = email.trim();   
-        }
-        
-        Finalstring = firstName + lastName + eemail;
-        
-        return Finalstring;
-        
-    }
+ 
     
     
     // commented by Vandana 5/4/24 as this method is not used anywhere
@@ -1396,7 +1378,7 @@ insert ListToFinalInsert;
     
     public void finish(Database.BatchableContext BC) {
         
-       /* if(!test.isrunningtest()) {
+        if(!test.isrunningtest()) {
             List<Manage_Eventsair_Fun_Reg_Apex_batch__c> lstcustsett2 = [SELECT Id, Name, Offset__c, Is_Execute_Next__c 
                                                                          FROM Manage_Eventsair_Fun_Reg_Apex_batch__c LIMIT 1];            
             // Your finish logic goes here
@@ -1406,12 +1388,21 @@ insert ListToFinalInsert;
                 lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
                 update lstcustsett2;
                 
-                ImportFuncRegistartionFromEventsAirBatch newBatch = new ImportFuncRegistartionFromEventsAirBatch(strEventId, sfeventId);
+                ImportFunRegBatchForLiveEvent newBatch = new ImportFunRegBatchForLiveEvent();
                 Database.executeBatch(newBatch, 500);
             }
             else {
                 lstcustsett2[0].Is_Execute_Next__c = true;
                 update lstcustsett2;
+                List<Event__c> updteventlstNextdt = new List<Event__c>();
+                System.debug('### sfeventId  = '+sfeventId);
+                Event__c evnt = new Event__c();
+                if(sfeventId != null){
+                    evnt.Id = sfeventId;
+                    evnt.Next_Date__c = System.today();
+                    updteventlstNextdt.add(evnt);
+                    update updteventlstNextdt;
+                }
                 
                 System.debug('### sfeventId  = '+sfeventId);
                 FeedItem post = new FeedItem();
@@ -1419,7 +1410,7 @@ insert ListToFinalInsert;
                 post.Body = 'Apex batch End for fetching function Registration EventsAir Data';
                 insert post;                
             }
-        }*/
+        }
         
         
     }

@@ -11,6 +11,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
     public String strEventId;
     public String sfeventId;
     public String eventCategory;
+    public String recordType;
     Integer contactsLimit = Integer.valueOf(System.Label.EventsAir_Attendee_Contact_Limit);
     Integer regLimit = Integer.valueOf(System.Label.EventsAir_Registartion_Limit);
     
@@ -32,12 +33,13 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
     
     public ImportRegistartionBatchForLiveEvent() {        
         Date todayDate = Date.today();
-        List<Event__c> lstEvent = [SELECT Id, EventsAirID__c, Close_Date__c, Next_Date__c FROM Event__c WHERE Close_Date__c > :todayDate 
+        List<Event__c> lstEvent = [SELECT Id, EventsAirID__c, Close_Date__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate and Registration_Types__c = null
                                    and EventsAirID__c != null and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
         
         for(Event__c evnt: lstEvent) {
             sfeventId = evnt.Id;
             strEventId = evnt.EventsAirID__c;
+            recordType = evnt.RecordType.Name;
         } 
     }
     
@@ -52,7 +54,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
             
             
             
-            String strtoken = EventsAirOAuthTokenRequest.getAccessToken();
+            String strtoken = EventsAirOAuthTokenRequest.getAccessToken(recordType);
             
             //Prepare API Query        
             String graphqlQuery = '{' +

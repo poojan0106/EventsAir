@@ -1,11 +1,4 @@
-/*************************
-* Created By : Foram 
-* Cereated Date : 12-01-2024
-* Description : Import Function Registration from Evntsair and 
-Create Contact/Lead, Registartion, Opportunity and Opportunity Products 
-**************************/
-
-public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batchable<ResponseWrapper>, Database.AllowsCallouts {
+public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<ResponseWrapper>, Database.AllowsCallouts {
     
     //variable declartion
     public String strEventId;
@@ -18,6 +11,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     List<Lead> lstInsrtLead;    
     List<Function__c> lstInsrtFun; 
     List<Function__c> ListToFinalInsert;
+        Map<String, String> selectedValuesMap = new Map<String, String>();
     Map<String, Id> mapofConEmailAndId = new Map<String, Id>();
     Map<String, Id> mapofLeadEmailAndId = new Map<String, Id>();
     Map<String, Id> mapOfEventregTypeAndSFproId = new Map<String, Id>();
@@ -30,11 +24,16 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     //fetch current offset value from custom setting
     List<Manage_Eventsair_Fun_Reg_Apex_batch__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c 
                                                                 from Manage_Eventsair_Fun_Reg_Apex_batch__c LIMIT 1];
-    public ImportFuncRegistartionFromEventsAirBatch(String eventId, String strsfeventId) {
-        // List<Event__c> lstEvent = [Select Id, EventsAirID__c from Event__c where Batch_Execution_Time__c != null Limit 1];
+    public ImportFunRegSeprateSecAndInteBatch() {
+         Date todayDate = Date.today();
+        List<Event__c> lstEvent = [SELECT Id, EventsAirID__c, Close_Date__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate and Registration_Types__c != null
+                                   and EventsAirID__c != null and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
         
-        strEventId = eventId;
-        sfeventId = strsfeventId;     
+        System.debug('%%% lstEvent = '+lstEvent);
+        for(Event__c evnt: lstEvent) {
+            sfeventId = evnt.Id;
+            strEventId = evnt.EventsAirID__c;
+        }          
     }
     
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
@@ -155,6 +154,14 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
         
+         List<Event__c> eventData = [Select Id,Name,Registration_Types__c,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
+        if (String.isNotBlank(eventData[0].Registration_Types__c)) {
+            List<String> selectedValues = eventData[0].Registration_Types__c.split(';');
+            for (String value : selectedValues) {
+                selectedValuesMap.put(value, value);
+            }
+        }
+        
         String serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
         Map<String, Object> jsonResponse = (Map<String, Object>) JSON.deserializeUntyped(serializedResponseWrapper);
         Map<String, Object> eventDatamap = (Map<String, Object>) jsonResponse.get('data');        
@@ -269,6 +276,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         System.debug('@@@ mapOfDomainNameAndAccId ='+mapOfDomainNameAndAccId);
         
         List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId];
+        System.debug('lstPriceook'+lstPriceook);
         Pricebook2 standardPriceBook = [ SELECT Id FROM Pricebook2 WHERE isStandard = true LIMIT 1];
         
         //Loop through event's air contacts data to check if need to create contact or lead based on account's domain name
@@ -463,7 +471,7 @@ newLead.PostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
                 objreg.RecordTypeId = Schema.SObjectType.Registration__c.getRecordTypeInfosByDeveloperName().get('Function_Registration').getRecordTypeId(); 
                 objreg.EventsAir_Regisration_ID__c = (String) eventReg.get('id');
                 objreg.EventsAir_Contact_Id__c = (String) eventconmap.get('id');
-                objreg.Event__c = sfeventId; 
+                objreg.Event__c = 'a0sAD000000m0VZYAY'; 
                 String strtickets = (String) eventReg.get('tickets');
                 string FunctionId;
                 objreg.Number_of_Tickets__c = Decimal.valueOf(strtickets);
@@ -513,12 +521,12 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
                     } else {
                         objreg.Lead__c = mapofLeadEmailAndId.get(Finalstring);
                     }
-                }    
+                } 
                 if(eventregtypemap.get('name') != null){
                     if(!Test.isRunningTest()){
                         objreg.Registration_Type__c = (String) eventregtypemap.get('name'); 
                     }
-                }                
+                }             
                 if(eventregPaymentdetails.get('paymentStatus') != null) {
                     objreg.Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');                     
                 } 
@@ -528,8 +536,14 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
                 if(eventReg.get('checkOutDate') != null) {
                     objreg.CheckOutDate__c = (Datetime)eventReg.get('checkOutDate');                     
                 }
-                lstInsrtReg.add(objreg); 
-                
+              /*  System.debug(selectedValuesMap);
+                System.debug('@@ registration type '+(String) eventregtypemap.get('name'));
+                System.debug(selectedValuesMap.containsKey((String) eventregtypemap.get('name')));
+                if (selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {
+                    System.debug('@@Inside Registaryion');
+                    lstInsrtReg.add(objreg);
+                } */
+                lstInsrtReg.add(objreg);
                 System.debug('@@@ isexecuted = '+isexecuted);
                 System.debug('@@@ totalcharge = '+totalcharge);
                 
@@ -554,8 +568,11 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
                         objOpp.LeadSource = 'EventsAir';
                         objOpp.Closedate = System.today();
                         objOpp.RecordTypeId = Schema.SObjectType.Opportunity.getRecordTypeInfosByDeveloperName().get('Divcom_Visitor').getRecordTypeId();
+                        system.debug('sfeventId'+sfeventId);
                         objOpp.Event__c = sfeventId;
-                        objOpp.EventsAir_Contact_Id__c = strevntconId;
+                        system.debug('(String) eventconmap.get'+(String) eventconmap.get('id'));
+                        objOpp.EventsAir_Contact_Id__c = (String) eventconmap.get('id');
+                        system.debug('lstPriceook[0].Id'+lstPriceook[0].Id);
                         objOpp.Pricebook2Id =lstPriceook[0].Id;
                         objOpp.stageName = 'Closed Won'; 
                         
@@ -590,6 +607,7 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
         
         //fetch pricebook
         List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId];
+        system.debug('lstPriceook'+lstPriceook);
         Pricebook2 standardPriceBook = [ SELECT Id FROM Pricebook2 WHERE isStandard = true LIMIT 1];
         
         List<Opportunity> lstofOpportunity = [select id,Name,CreatedDate,EventsAir_Contact_Id__c from Opportunity where id in :lstInsrtOpp];
@@ -905,13 +923,15 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
             
             if(finallisttoinsertoli.size() >0) {
                 system.debug('Oli'+finallisttoinsertoli.size());
+                 system.debug('Oli'+finallisttoinsertoli);
                 insert finallisttoinsertoli;
                 UpdateRegistrationsOLI(finallisttoinsertoli);
             }
         }
         
     }
-     public static void UpdateRegistrationsOLI(List<OpportunityLineItem> finallisttoinsertoli){
+    
+     public void UpdateRegistrationsOLI(List<OpportunityLineItem> finallisttoinsertoli){
         system.debug(finallisttoinsertoli);
         List<string> LstOfEventsairRegId = new List<string>(); 
         Map<string,Id> MapOfEventsairRegIdandOLI = new Map<string,Id>();
@@ -927,10 +947,12 @@ oli.TotalPrice = oli.Quantity * (mapOfEventRegTypeIdAndSFPBentryPrice.get(strReg
             reg.Opportunity_Product__c = MapOfEventsairRegIdandOLI.get(reg.EventsAir_Regisration_ID__c);
             
         }
+         system.debug('lstOfRegistrationtoLink '+lstOfRegistrationtoLink);
         //update lstOfRegistrationtoLink;
         Database.update(lstOfRegistrationtoLink,false);
         
     }
+    
     
     // commented by Vandana 5/4/24 as this method is not used anywhere
     /* public static List<Contact> removeContactsDuplicates(List<Contact> contactList) {
@@ -1178,7 +1200,7 @@ System.debug('not valid');
         
     }
     
-    public void LinkFunctionToRegistration(List<Registration__c> lstRegistration) {
+   /* public void LinkFunctionToRegistration(List<Registration__c> lstRegistration) {
         
         Set<String> setOfEventFunId = new Set<String>();
         List<Function__c> lstFunction;
@@ -1215,7 +1237,7 @@ System.debug('not valid');
                 update lstupdtReg;
             }
         }
-    }
+    }*/
     
     
     // method to insert new Opportunity(no duplicates) in salesforce
@@ -1396,7 +1418,7 @@ insert ListToFinalInsert;
     
     public void finish(Database.BatchableContext BC) {
         
-       /* if(!test.isrunningtest()) {
+        if(!test.isrunningtest()) {
             List<Manage_Eventsair_Fun_Reg_Apex_batch__c> lstcustsett2 = [SELECT Id, Name, Offset__c, Is_Execute_Next__c 
                                                                          FROM Manage_Eventsair_Fun_Reg_Apex_batch__c LIMIT 1];            
             // Your finish logic goes here
@@ -1406,12 +1428,22 @@ insert ListToFinalInsert;
                 lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
                 update lstcustsett2;
                 
-                ImportFuncRegistartionFromEventsAirBatch newBatch = new ImportFuncRegistartionFromEventsAirBatch(strEventId, sfeventId);
+                ImportFunRegSeprateSecAndInteBatch newBatch = new ImportFunRegSeprateSecAndInteBatch();
                 Database.executeBatch(newBatch, 500);
             }
             else {
                 lstcustsett2[0].Is_Execute_Next__c = true;
                 update lstcustsett2;
+               
+                List<Event__c> updteventlstNextdt = new List<Event__c>();
+                System.debug('### sfeventId  = '+sfeventId);
+                Event__c evnt = new Event__c();
+                if(sfeventId != null){
+                    evnt.Id = sfeventId;
+                    evnt.Next_Date__c = System.today();
+                    updteventlstNextdt.add(evnt);
+                    update updteventlstNextdt;
+                }
                 
                 System.debug('### sfeventId  = '+sfeventId);
                 FeedItem post = new FeedItem();
@@ -1419,7 +1451,7 @@ insert ListToFinalInsert;
                 post.Body = 'Apex batch End for fetching function Registration EventsAir Data';
                 insert post;                
             }
-        }*/
+        }
         
         
     }

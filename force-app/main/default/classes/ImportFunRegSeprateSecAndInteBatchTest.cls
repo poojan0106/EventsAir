@@ -1,10 +1,9 @@
 @isTest
-public with sharing class ImportRegSeprateSecAndInteBatchTest {
-    
-    static testMethod void testExecuteBatch() {
+public class ImportFunRegSeprateSecAndInteBatchTest {
+      static testMethod void testExecuteBatch() {
         // Create a custom Event record for testing
         
-		 Test.setMock(HttpCalloutMock.class, setStaticMock('importregistrationMock'));
+		 Test.setMock(HttpCalloutMock.class, setStaticMock('importfuncregistrationMock'));
         
         RecordType rt = [SELECT Id,Name FROM RecordType WHERE SObjectType = 'Event__c' AND Name = 'Trade Show' LIMIT 1];
 
@@ -13,7 +12,7 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
         system.debug('testEvent'+testEvent);
         insert testEvent;
         
-        Manage_Eventsair_Reg_Apex_batch__c meab = new Manage_Eventsair_Reg_Apex_batch__c();
+        Manage_Eventsair_Fun_Reg_Apex_batch__c meab = new Manage_Eventsair_Fun_Reg_Apex_batch__c();
         meab.Name = 'test vandana';
         meab.Offset__c = 0;
         meab.Is_Execute_Next__c = true;
@@ -24,6 +23,9 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
         acc.Name = 'Test account - 2';
         acc.Domain_Name__c = 'gmail.com';
         insert acc;
+          
+            Pricebook2 standardPricebook = new Pricebook2(Id =Test.getStandardPricebookId(),IsActive = true);
+        update standardPricebook;
         
         contact con = new Contact();
         con.Email = 'vandana@gmail.com';
@@ -40,18 +42,15 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
         ld.Company = 'Unknown';
         insert ld;
         
-          Pricebook2 standardPricebook = new Pricebook2(Id =Test.getStandardPricebookId(),IsActive = true);
-        update standardPricebook;
-        
           String jobName = 'Test Registration Batch Job';
         String cronExpression = '0 0 */2 * * ?'; // Every 2 hours
-        
+        Decimal totalcharge = 100;
         
         Test.startTest();
-        System.schedule(jobName, cronExpression, new ImportRegSeprateSecAndInteBatchScheduler());
-        ImportRegSeprateSecAndInteBatch batchInstance = new ImportRegSeprateSecAndInteBatch();
+        System.schedule(jobName, cronExpression, new ImportFunRegSepSecAndInteBatchscheduler());
+        ImportFunRegSeprateSecAndInteBatch batchInstance = new ImportFunRegSeprateSecAndInteBatch();
         Database.executeBatch(batchInstance);
-        
+        ImportFunRegSeprateSecAndInteBatch.isValidEmail('abc@gmail.com');
         Test.stopTest();
        
   }
@@ -64,4 +63,5 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
         mock.setHeader('Content-Type', 'application/json');
         return mock;
     }
+
 }

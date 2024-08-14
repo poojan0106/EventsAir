@@ -19,15 +19,44 @@ public class ResponseWrapper {
         public String lastName;
         public String firstName;
         public String title;
+        public Datetime checkInDate;
+        public Datetime checkOutDate;
         public String organizationName;
         public String primaryEmail;
         public ContactPhoneNumbers contactPhoneNumbers;
         public primaryAddress primaryAddress;
         public List<Registration> registrations;
         List<FunctionRegistration> functionRegistrations;
+        List<CustomField> customFields;
+        List<EventMarketingRecord> marketingRecords;
         Datetime lastModifiedAt;
     }
     
+    public class CustomField {
+        public String name;
+        public String uniqueCode;
+        public String value;
+        public String definitionId;
+        
+    }
+    
+    public class CustomFieldSearchFilterInput {
+        public String id;
+        public String names;
+        public String uniqueCodes;
+        
+    }
+    
+    public class EventMarketingRecord{
+         public String name;
+         public String value;
+         public tag tag;
+         public String id;
+    }
+    public class tag{
+        public String id;
+        public String name;
+    }
     public class Event {
         public String id;
          public String name;
@@ -80,6 +109,8 @@ public class ResponseWrapper {
         public String tickets;
         public Contact contact;
         public Function function;
+        public Datetime checkInDate;
+        public Datetime checkOutDate;
         public RegistrationPaymentDetails paymentDetails;
         public FunctionFeeType feeType;
     }
