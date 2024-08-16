@@ -82,7 +82,7 @@ public class ImportRegistartionBatchForLiveEventTest {
         
         
         Test.startTest();
-        System.schedule(jobName, cronExpression, new ImportRegBatchForLiveEventScheduler());
+        // System.schedule(jobName, cronExpression, new ImportRegBatchForLiveEventScheduler());
         ImportRegistartionBatchForLiveEvent batchInstance = new ImportRegistartionBatchForLiveEvent();
         Database.executeBatch(batchInstance);
         

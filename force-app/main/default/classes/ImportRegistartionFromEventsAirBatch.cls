@@ -14,6 +14,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     Integer contactsLimit = Integer.valueOf(System.Label.EventsAir_Attendee_Contact_Limit);
     Integer regLimit = Integer.valueOf(System.Label.EventsAir_Registartion_Limit);
     List<Contact> lstInsrtCon;
+    List<Product_Service_Option__c> lstInsrtProdAndServices; 
     List<Function__c> lstInsrtFun;        
     Map<String, Id> mapofConEmailAndId = new Map<String, Id>();
     Map<String, Id> mapOfEventregTypeAndSFproId = new Map<String, Id>();
@@ -301,9 +302,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     public void createRecords(List<Object> lsteventsairContacts) {
         
         lstInsrtCon = new List<Contact>();
+        lstInsrtProdAndServices = new List<Product_Service_Option__c>();
         Set<String> setOfDomainName = new Set<String>();
         Map<String, Id> mapOfDomainNameAndAccId = new Map<String, Id>();
-         Map<String, Id> mapOfDomainNameAndAccOwnerId = new Map<String, Id>();
         
         system.debug('createRecords');
         //Loop through event's air contacts data to extract contact's email domain name
@@ -481,155 +482,74 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             system.debug('insertContactsIfNotExist');
         }
 
-        // create product service option if record type mumbrella (Marketing records of eventsAir) , else (Interest records of eventsAir)
-        if (RecordType != 'Mumbrella') {
-            List<Product_Service_Option__c> lstInsrtProdAndServices = new List<Product_Service_Option__c>(); 
-            // Loop through event's air contacts data to create Product & Services
-            for(Object objeventcon : lsteventsairContacts) {
-                Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;
-                List<Object> lsteventsairRecMarket = (List<Object>) eventconmap.get('marketingRecords');
-                String strevntconId = (String) eventconmap.get('id');
-                // Loop through marketing data of events Air fro insert
-                for(Object objEventMarketing : lsteventsairRecMarket) {
-                    Map<String, Object> prodAndSerMap = (Map<String, Object>) objEventMarketing;
+        // Loop through event's air contacts data to create Product & Services
+        for(Object objeventcon : lsteventsairContacts) {
+            Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;
+            List<Object> lsteventsairRecMarket = (List<Object>) eventconmap.get('marketingRecords');
+            String strevntconId = (String) eventconmap.get('id');
+            
+            for(Object objEventMarketing : lsteventsairRecMarket) {
+                Map<String, Object> prodAndSerMap = (Map<String, Object>) objEventMarketing;
 
-                    // Map<String, Object> lsteventsairRecMarketTag = (Map<String, Object>) prodAndSerMap.get('tag');
-                    // System.debug('lsteventsairRecMarketTag :---->' + lsteventsairRecMarketTag);
+                // Map<String, Object> lsteventsairRecMarketTag = (Map<String, Object>) prodAndSerMap.get('tag');
+                // System.debug('lsteventsairRecMarketTag :---->' + lsteventsairRecMarketTag);
 
-                    String prodAndServiceName = (String) prodAndSerMap.get('name');
-                    String containsWord = 'Products & Service Categories';
-                    Boolean containsSubstring = prodAndServiceName.toLowerCase().contains(containsWord.toLowerCase());
-    
-                    if (containsSubstring) {
-                        
-                        Product_Service_Option__c prodAndService = new Product_Service_Option__c();
-                        prodAndService.EventsAirMarketing_Record_ID__c = (String) prodAndSerMap.get('id');
-                        prodAndService.Name =  prodAndServiceName;
-                        prodAndService.Marketing_Value__c = (String) prodAndSerMap.get('value');
-    
-                        String streventconEmail = (String) eventconmap.get('primaryEmail');
-                        String streventconfname = (String) eventconmap.get('firstName');
-                        String streventconlname = (String) eventconmap.get('lastName');
-                        
-                        if(streventconlname == null || streventconlname == '') {
-                            streventconlname = '';
-                        }
-                        
-                        string fname;
-                        string lname; 
-                        string email ;
-                        
-                        if(streventconfname != null){
-                            if(streventconfname.length() <= 40) {
-                                fname = streventconfname.trim();
-                            } else {
-                                fname = streventconfname.substring(0,40).trim();
-                            }
-                        }
-                        else{
-                        fname = ''; 
-                        }
-                        
-                        if(streventconlname != null){
-                            lname = streventconlname.trim(); 
-                        }else{
-                        lname = 'UnKnown'; 
-                        }
-                        
-                        if(streventconEmail != null){
-                            email = streventconEmail.trim(); 
-                        }else{
-                        email = ''; 
-                        }
-                    
-                        string Finalstring = fname + lname + email;
-                        Finalstring = Finalstring.toLowerCase();
-                        if(Finalstring != null && Finalstring != '') {
-                            if(mapofConEmailAndId.containsKey(Finalstring)) {
-                                prodAndService.Contact__c = mapofConEmailAndId.get(Finalstring);
-                            }
-                        }
-    
-                        lstInsrtProdAndServices.add(prodAndService);
+                String prodAndServiceName = (String) prodAndSerMap.get('name');
+                
+                Product_Service_Option__c prodAndService = new Product_Service_Option__c();
+                prodAndService.EventsAirMarketing_Record_ID__c = (String) prodAndSerMap.get('id');
+                prodAndService.Name =  prodAndServiceName;
+                prodAndService.Marketing_Value__c = (String) prodAndSerMap.get('value');
+
+                String streventconEmail = (String) eventconmap.get('primaryEmail');
+                String streventconfname = (String) eventconmap.get('firstName');
+                String streventconlname = (String) eventconmap.get('lastName');
+                
+                if(streventconlname == null || streventconlname == '') {
+                    streventconlname = '';
+                }
+                
+                string fname;
+                string lname; 
+                string email ;
+                
+                if(streventconfname != null){
+                    if(streventconfname.length() <= 40) {
+                        fname = streventconfname.trim();
+                    } else {
+                        fname = streventconfname.substring(0,40).trim();
                     }
                 }
-            }
-            System.debug('lstInsrtProdAndServices :-->' + lstInsrtProdAndServices);   
-            insertProdAndServicesIfNotExist(lstInsrtProdAndServices);
- 
-        }
-        if (RecordType == 'Mumbrella') {
-            List<Product_Service_Option__c> lstInsrtProdAndServices = new List<Product_Service_Option__c>(); 
-            // Loop through event's air contacts data to create Product & Services
-            for(Object objeventcon : lsteventsairContacts) {
-                Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;
-                List<Object> lsteventsairRecMarket = (List<Object>) eventconmap.get('marketingRecords');
-                String strevntconId = (String) eventconmap.get('id');
-                
-                for(Object objEventMarketing : lsteventsairRecMarket) {
-                    Map<String, Object> prodAndSerMap = (Map<String, Object>) objEventMarketing;
-
-                    // Map<String, Object> lsteventsairRecMarketTag = (Map<String, Object>) prodAndSerMap.get('tag');
-                    // System.debug('lsteventsairRecMarketTag :---->' + lsteventsairRecMarketTag);
-
-                    String prodAndServiceName = (String) prodAndSerMap.get('name');
-                    
-                    Product_Service_Option__c prodAndService = new Product_Service_Option__c();
-                    prodAndService.EventsAirMarketing_Record_ID__c = (String) prodAndSerMap.get('id');
-                    prodAndService.Name =  prodAndServiceName;
-                    prodAndService.Marketing_Value__c = (String) prodAndSerMap.get('value');
-
-                    String streventconEmail = (String) eventconmap.get('primaryEmail');
-                    String streventconfname = (String) eventconmap.get('firstName');
-                    String streventconlname = (String) eventconmap.get('lastName');
-                    
-                    if(streventconlname == null || streventconlname == '') {
-                        streventconlname = '';
-                    }
-                    
-                    string fname;
-                    string lname; 
-                    string email ;
-                    
-                    if(streventconfname != null){
-                        if(streventconfname.length() <= 40) {
-                            fname = streventconfname.trim();
-                        } else {
-                            fname = streventconfname.substring(0,40).trim();
-                        }
-                    }
-                    else{
-                    fname = ''; 
-                    }
-                    
-                    if(streventconlname != null){
-                        lname = streventconlname.trim(); 
-                    }else{
-                    lname = 'UnKnown'; 
-                    }
-                    
-                    if(streventconEmail != null){
-                        email = streventconEmail.trim(); 
-                    }else{
-                    email = ''; 
-                    }
-                
-                    string Finalstring = fname + lname + email;
-                    Finalstring = Finalstring.toLowerCase();
-                    if(Finalstring != null && Finalstring != '') {
-                        if(mapofConEmailAndId.containsKey(Finalstring)) {
-                            prodAndService.Contact__c = mapofConEmailAndId.get(Finalstring);
-                        }
-                    }
-
-                    lstInsrtProdAndServices.add(prodAndService);
-                    
+                else{
+                fname = ''; 
                 }
+                
+                if(streventconlname != null){
+                    lname = streventconlname.trim(); 
+                }else{
+                lname = 'UnKnown'; 
+                }
+                
+                if(streventconEmail != null){
+                    email = streventconEmail.trim(); 
+                }else{
+                email = ''; 
+                }
+            
+                string Finalstring = fname + lname + email;
+                Finalstring = Finalstring.toLowerCase();
+                if(Finalstring != null && Finalstring != '') {
+                    if(mapofConEmailAndId.containsKey(Finalstring)) {
+                        prodAndService.Contact__c = mapofConEmailAndId.get(Finalstring);
+                    }
+                }
+
+                lstInsrtProdAndServices.add(prodAndService);         
             }
-            System.debug('lstInsrtProdAndServices from mumbrella:-->' + lstInsrtProdAndServices);   
-            insertProdAndServicesIfNotExist(lstInsrtProdAndServices);
- 
         }
+        System.debug('lstInsrtProdAndServices from mumbrella:-->' + lstInsrtProdAndServices);   
+        insertProdAndServicesIfNotExist(lstInsrtProdAndServices);
+
 
         List<Registration__c> lstInsrtReg = new List<Registration__c>(); 
         List<Opportunity> lstInsrtOpp = new List<Opportunity>();        
@@ -644,17 +564,6 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             String checkInDate = (String) eventconmap.get('checkInDate');
             String checkOutDate = (String) eventconmap.get('checkOutDate');
             boolean isexecuted = false;
-            
-             String strcontEmail = (String) eventconmap.get('primaryEmail');           
-            String strAccdomainname;
-            
-            //extract domain name from contact's email
-            if(strcontEmail != null && strcontEmail != '') {
-                String[] emailparts = strcontEmail.split('@');
-                if (emailparts.size() > 1) {
-                    strAccdomainname = emailparts[1].trim();
-                }
-            }
             
             for(Object objEventReg : lsteventsairReg) {
                 Map<String, Object> eventReg = (Map<String, Object>) objEventReg;
