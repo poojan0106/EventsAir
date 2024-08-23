@@ -9,7 +9,7 @@ public class CustomEventController {
         // Query records in smaller batches
         List<Id> lstContact = new List<Id>();
         List<Function__c> lstFunction = [SELECT Id FROM Function__c WHERE Events__c = :customEvent.Id];
-        List<Registration__c> lstRegistration = [SELECT Id, Event__c, Contact__c FROM Registration__c WHERE Event__c = :customEvent.Id];
+        List<Registration__c> lstRegistration = [SELECT Id, Event__c, Contact__c FROM Registration__c WHERE Event__c = :customEvent.Id LIMIT 5000];
         System.debug(lstRegistration.size());
         List<Opportunity> lstOpp = [SELECT Id, Name FROM Opportunity WHERE Event__c = :customEvent.Id AND RecordType.Name != 'Divcom_Exhibitor'];
 

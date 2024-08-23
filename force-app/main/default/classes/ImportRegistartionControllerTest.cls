@@ -77,12 +77,9 @@ update standardPricebook;
         insert objpricebookentry;
         ApexPages.StandardController controller = new ApexPages.StandardController(testEvent);
 
+        Test.startTest();
         ImportRegistartionController controllerInstance = new ImportRegistartionController(controller);
         Database.executeBatch(new ImportRegistartionFromEventsAirBatch(testEvent.EventsAirID__c, testEvent.Id), 100);
-        
-       
-        Test.startTest();
-        
         PageReference resultPage = controllerInstance.executeBatch();
         Test.stopTest();
   }

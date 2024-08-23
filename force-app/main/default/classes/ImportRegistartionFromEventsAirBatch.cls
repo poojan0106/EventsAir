@@ -307,20 +307,99 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         Map<String, Id> mapOfDomainNameAndAccId = new Map<String, Id>();
         
         system.debug('createRecords');
+        Set<String> AccountNamesForCheckCreation = new Set<String>();
+        Set<String> accNeedToCreatePre = new Set<String>();
+
         //Loop through event's air contacts data to extract contact's email domain name
         for(Object objeventcon: lsteventsairContacts) {
 
             Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;            
             String strevntconemail = (String) eventconmap.get('primaryEmail');            
-
+            String orgNameForAccCreation = (String) eventconmap.get('organizationName');
+            String orgNameOfAccountInSF;
+            String domainForOrganizationwhichNulls;
             if(strevntconemail != null && strevntconemail != '') {
                 String[] emailparts = strevntconemail.split('@');
                 if (emailparts.size() > 1) {
                     setOfDomainName.add(emailparts[1].trim().toLowerCase());
+                    domainForOrganizationwhichNulls = emailparts[1].trim().toLowerCase();
+                }
+            }else {
+                if(orgNameForAccCreation != null && orgNameForAccCreation != ''){
+                    if (orgNameForAccCreation.length() > 80) {
+                        orgNameOfAccountInSF = (orgNameForAccCreation.length() > 80) ? orgNameForAccCreation.substring(0, 80) : orgNameForAccCreation;    
+                    } else{
+                        orgNameOfAccountInSF = orgNameForAccCreation;
+                    }
+                    accNeedToCreatePre.add(orgNameOfAccountInSF.toLowerCase());
                 }
             }
-        }
 
+            if(orgNameForAccCreation != null && orgNameForAccCreation != ''){
+                if (orgNameForAccCreation.length() > 80) {
+                    orgNameOfAccountInSF = (orgNameForAccCreation.length() > 80) ? orgNameForAccCreation.substring(0, 80) : orgNameForAccCreation;    
+                } else{
+                    orgNameOfAccountInSF = orgNameForAccCreation;
+                }
+                AccountNamesForCheckCreation.add(orgNameOfAccountInSF.toLowerCase());
+            }else {
+                if (domainForOrganizationwhichNulls != '' && domainForOrganizationwhichNulls != null) {
+                        AccountNamesForCheckCreation.add(domainForOrganizationwhichNulls.toLowerCase());
+                }else {
+                    System.debug('Organization Name and domain both are null which is not preferable');
+                }
+            }
+
+        }
+        System.debug('accNeedToCreatePre :-'+ accNeedToCreatePre);
+        System.debug('AccountNamesForCheckCreation :-'+ AccountNamesForCheckCreation);
+        System.debug('AccountNamesForCheckCreation size :-'+ AccountNamesForCheckCreation.size());
+
+        if (accNeedToCreatePre.size() > 0) {
+            List<Account> newCreateAccListOfOrgNames = [SELECT Id,Name,Domain_Name__c From Account Where Name IN :accNeedToCreatePre  AND Account_Status__c != 'Inactive' and On_Hold__c = false];
+            List<String> existingOrgNameInSfAccRecords = new List<String>();
+
+            if(newCreateAccListOfOrgNames.size() > 0){
+                for(Account acc : newCreateAccListOfOrgNames){
+                    accNeedToCreatePre.remove(acc.Name.toLowerCase());
+                }
+            }
+        }    
+        if (accNeedToCreatePre.size() > 0) {
+            List<Account> listAccPreCreate = new List<Account>();
+
+            for(String accName: accNeedToCreatePre) {
+
+                Account newAccount = new Account();
+                if (RecordType == 'Mumbrella') {
+                    newAccount.RecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId();
+                } else {
+                    newAccount.RecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Diversified').getRecordTypeId();     
+                }
+                if(accName != null && accName != ''){
+                    newAccount.Name = (accName.length() > 80) ? accName.substring(0, 80) : accName;
+                }else{
+                    newAccount.Name = 'UNKNOWN';
+                }
+                newAccount.AccountSource = 'EventsAir';
+                listAccPreCreate.add(newAccount);
+            }
+            if (listAccPreCreate.size() > 0) {
+                insert listAccPreCreate;
+            }
+            System.debug('Account Inserted SuccessFully');
+        }
+       
+
+        //create map for if domain not match check for account name with organization name of event's Air data
+        Map<String, String> MapOfexistingAccountsOrgNameAndAccount = new Map<String, String>();
+        if (AccountNamesForCheckCreation != null) {
+            List<Account> exitingAccListOfOrgNames = [SELECT Id,Name,Domain_Name__c From Account Where Name IN :AccountNamesForCheckCreation  AND Account_Status__c != 'Inactive' and On_Hold__c = false];
+        
+            for (Account acct : exitingAccListOfOrgNames) {
+                MapOfexistingAccountsOrgNameAndAccount.put(acct.Name.toLowerCase(),acct.Id);
+            }
+        }
         //if set contains any value then do soql on account and fill the mapOfDomainNameAndAccId Map
         if(setOfDomainName != null) {
             for (AggregateResult aggregateResult : [
@@ -338,13 +417,13 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             }
         }
 
-        Map<String, Account> existingAccountsMap = new Map<String, Account>();
+        Map<String, Account> existingAccountsMapForDomainName = new Map<String, Account>();
         List<Account> accountToInsertList = new List<Account>();
 
         // Retrieve existing Accounts
         List<Account> existingAccounts = [SELECT Id, Name,Domain_Name__c FROM Account WHERE Domain_Name__c IN :setOfDomainName AND Account_Status__c != 'Inactive' and On_Hold__c = false];
         for (Account acc : existingAccounts) {
-            existingAccountsMap.put(acc.Domain_Name__c.toLowerCase(), acc);
+            existingAccountsMapForDomainName.put(acc.Domain_Name__c.toLowerCase(), acc);
         }
 
         List<Event__c> eventData = [Select Id,Name,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
@@ -354,6 +433,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;
             String strcontEmail = (String) eventconmap.get('primaryEmail');           
             String strAccdomainname;
+            String orgNameForMap = (String) eventconmap.get('organizationName');
             
             //extract domain name from contact's email
             if(strcontEmail != null && strcontEmail != '') {
@@ -362,7 +442,20 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                     strAccdomainname = emailparts[1].trim().toLowerCase();
                 }
             }
-            
+
+            if(orgNameForMap != null && orgNameForMap != ''){
+                if (orgNameForMap.length() > 80) {
+                    orgNameForMap = (orgNameForMap.length() > 80) ? orgNameForMap.substring(0, 80).toLowerCase() : orgNameForMap.toLowerCase();    
+                } else{
+                    orgNameForMap = orgNameForMap.toLowerCase();
+                }
+            }else {
+                if (strAccdomainname != '' && strAccdomainname != null) {
+                    orgNameForMap = strAccdomainname.toLowerCase();
+                }else {
+                    System.debug('Organization Name and domain both are null which is not preferable for con');
+                }
+            }
 
             Contact objcon = new Contact();
             objcon.RecordTypeId = Schema.SObjectType.Contact.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();  
@@ -426,10 +519,13 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             //create contact if found the exiting account based on domain name and create account and contact if not found                        
             if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
                 objcon.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-            } else {
-                String orgName = (String) eventconmap.get('organizationName');
-                if (!existingAccountsMap.containsKey(strAccdomainname)  && strAccdomainname != '' && strAccdomainname != null) {
-                   Account newAccount = new Account();
+            } else if(MapOfexistingAccountsOrgNameAndAccount.containsKey(orgNameForMap)){
+                System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccount.get(orgNameForMap));
+                objcon.AccountId = MapOfexistingAccountsOrgNameAndAccount.get(orgNameForMap);
+            }else{
+                if (!existingAccountsMapForDomainName.containsKey(strAccdomainname)  && strAccdomainname != '' && strAccdomainname != null) {
+                    String orgName = (String) eventconmap.get('organizationName');
+                    Account newAccount = new Account();
                     if (RecordType == 'Mumbrella') {
                         newAccount.RecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId();
                     } else {
@@ -443,7 +539,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                     newAccount.AccountSource = 'EventsAir';
                     newAccount.Domain_Name__c = strAccdomainname;
                     accountToInsertList.add(newAccount);
-                    existingAccountsMap.put(newAccount.Domain_Name__c, newAccount); 
+                    existingAccountsMapForDomainName.put(newAccount.Domain_Name__c, newAccount); 
                 }
             }
             lstInsrtCon.add(objcon);
@@ -457,7 +553,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
 
                 for (Account acc : accountToInsertList) {
                     MapOfDomainNameAndId.put(acc.Domain_Name__c.toLowerCase(), acc.Id);
-                    
+
                 }
                 // link new account and contact based on domain name of contact email
                 for (Contact con : lstInsrtCon) {
@@ -675,7 +771,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         }
         system.debug('@@mapOfContactStringAndId'+mapOfContactStringAndId);
         List<Contact> ListOfContactToInsert = new List<Contact>();
-         List<Contact> FinalListOfContactToInsert = new List<Contact>();
+        List<Contact> ListOfContactToUpdate = new List<Contact>();
+        Set<String> setOfCurrentContactCombinedDataToCheckForUpdate = new Set<String>();
+        List<Contact> FinalListOfContactToInsert = new List<Contact>();
         Set<String> setOfCurrentContactCombinedData = new Set<String>();
         
         for(Contact objcontact :contactsToInsert){
@@ -695,6 +793,13 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                
             }else{
                 system.debug('contact already exist in Salesforce');
+                if(!setOfCurrentContactCombinedDataToCheckForUpdate.contains(strcombinedEventsAirAttendee)){
+                    objcontact.Id = mapOfContactStringAndId.get(strcombinedEventsAirAttendee);
+                    ListOfContactToUpdate.add(objcontact);
+                    setOfCurrentContactCombinedDataToCheckForUpdate.add(strcombinedEventsAirAttendee);
+                }else {
+                    System.debug('attendee already added');
+                }
             }
         }
        
@@ -710,6 +815,15 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         
          if(FinalListOfContactToInsert.size()>0){
             Database.insert(FinalListOfContactToInsert,false);
+        }
+
+        if(ListOfContactToUpdate.size() > 0){
+            Database.SaveResult[] updateResults = Database.update(ListOfContactToUpdate, false);
+            for (Database.SaveResult sr : updateResults) {
+                if (!sr.isSuccess()) {
+                    system.debug('Failed to update Contact Id: ' + sr.getId() + ', Error: ' + sr.getErrors()[0].getMessage());
+                }
+            }
         }
         
         List<Contact> LstOfInnsertedCon = [Select Id,CombinedString__c from Contact where Id in :FinalListOfContactToInsert];
