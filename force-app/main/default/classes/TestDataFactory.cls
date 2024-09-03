@@ -246,7 +246,7 @@ public with sharing class TestDataFactory {
         newAccount.BillingPostalCode = '4000';
         newAccount.BillingCountry = 'Australia '+type;
         newAccount.Website = 'test'+type+'.com';
-        newAccount.Primary_Event_Category__c = 'AOG Energy';
+      //  newAccount.Primary_Event_Category__c = 'CommsCon';
         newAccount.Industry = 'Technology';
 
         return newAccount;

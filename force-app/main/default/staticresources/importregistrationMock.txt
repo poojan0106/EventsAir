@@ -89,7 +89,7 @@
                "organizationName":"Cleanup Services",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":"monica.abad1984@gmail.com",
+               "primaryEmail":null,
                "primaryAddress":{
                   "city":null,
                   "country":"Australia",
@@ -197,10 +197,10 @@
                "firstName":"Mahesh",
                "title":null,
                "lastModifiedAt":"2023-06-29T04:40:08.625Z",
-               "organizationName":"Mp Associates Pty Ltd",
+               "organizationName":"Mp Associates Pty Ltd new test Mp Associates Pty Ltd 12345 Mp Associates Pty Ltd Mp Associates Pty Ltd",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":"mptradingaus@gmail.com",
+               "primaryEmail":null,
                "primaryAddress":{
                   "city":null,
                   "country":"Australia",
@@ -365,7 +365,7 @@
                "organizationName":"Dimeo Cleaning",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":"matt@dimeo.com.au",
+               "primaryEmail":null,
                "primaryAddress":{
                   "city":null,
                   "country":"Australia",
@@ -629,9 +629,9 @@
                "firstName":"Carolina",
                "title":null,
                "lastModifiedAt":"2023-06-29T04:40:08.625Z",
-               "organizationName":"CleanUp Australia",
-               "checkInDate":null,
-               "checkOutDate":null,
+               "organizationName":null,
+               "checkInDate":"2023-06-29T04:40:08.625Z",
+               "checkOutDate":"2023-07-29T04:40:08.625Z",
                "primaryEmail":"carolinaaalvim@outlook.com",
                "primaryAddress":{
                   "city":null,
@@ -764,12 +764,12 @@
                ],
                "id":"E0432493-8AFC-48F3-8179-1365C71B6CD8",
                "lastName":"Amanaki",
-               "firstName":"Daisy",
+               "firstName":"Daisy ImportRegistartionControllerTest ImportRegistartionControllerTest",
                "title":null,
                "lastModifiedAt":"2023-06-29T04:40:08.625Z",
                "organizationName":"University Of Technology Sydney",
-               "checkInDate":null,
-               "checkOutDate":null,
+               "checkInDate":"2023-05-20T04:40:08.625Z",
+               "checkOutDate":"2023-05-25T04:40:08.625Z",
                "primaryEmail":"daisy.amanaki@uts.edu.au",
                "primaryAddress":{
                   "city":null,
@@ -793,17 +793,19 @@
                         "uniqueCode":null,
                         "fees":[
                            {
-                              "amount":0
+                              "amount":10
                            }
                         ]
                      },
                      "paymentDetails":{
-                        "paymentStatus":"COMPLIMENTARY",
-                        "discountAmount":0,
-                        "adjustmentAmount":0,
+                        "paymentStatus":"PURCHASE",
+                        "discountAmount":10,
+                        "adjustmentAmount":10,
                         "taxAmount":0,
-                        "totalChargeAmount":0,
-                        "discountCode":null
+                        "totalChargeAmount":100,
+                        "discountCode":{
+                           "code":"A021"
+                        }
                      }
                   }
                ]
@@ -901,7 +903,7 @@
                   }
                ],
                "id":"89C5FF27-3037-46B4-B004-CDA143D7AEF1",
-               "lastName":"Anderson",
+               "lastName":null,
                "firstName":"Robyn",
                "title":null,
                "lastModifiedAt":"2023-06-29T04:40:08.625Z",

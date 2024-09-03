@@ -104,10 +104,10 @@
                   }
                ],
                "id":"9BA4BD80-B0E6-4338-B4EE-7C40651D57B2",
-               "lastName":"`Ximenes Pires",
+               "lastName":"`Ximenes Pires Ximenes Pires Ximenes Pires Ximenes Pires Ximenes Pires",
                "firstName":"Reinalda",
                "title":"She/Her",
-               "organizationName":"Santos",
+               "organizationName":null,
                "checkInDate":"2024-03-13T00:36:38.188Z",
                "checkOutDate":null,
                "primaryEmail":"reinalda.pires@santos.com",
@@ -180,10 +180,10 @@
                "lastName":"A",
                "firstName":"Dr Zahedi",
                "title":"He/Him",
-               "organizationName":"Renewable Energy Engineering Consultancy",
-               "checkInDate":null,
-               "checkOutDate":null,
-               "primaryEmail":"ahmad.zahedi4@gmail.com",
+               "organizationName":"Renewable Energy Engineering Consultancy ",
+               "checkInDate":"2023-05-20T04:40:08.625Z",
+               "checkOutDate":"2023-06-20T04:40:08.625Z",
+               "primaryEmail":null,
                "primaryAddress":{
                   "city":null,
                   "country":"Australia",
@@ -259,12 +259,12 @@
                   }
                ],
                "id":"B475C98F-B7CD-4662-9864-25BD416664AE",
-               "lastName":"A Dawson",
+               "lastName":null,
                "firstName":"David",
                "title":"",
-               "organizationName":"DBM Vircon",
-               "checkInDate":null,
-               "checkOutDate":null,
+               "organizationName":"DBM Vircon ngineering Consultancy ngineering Consultancy Consultancy ngineering Consultancy Consultancy ngineering Consultancy",
+               "checkInDate":"2024-02-13T00:36:38.188Z",
+               "checkOutDate":"2024-03-13T00:36:38.188Z",
                "primaryEmail":"david.dawson@dbmvircon.com",
                "primaryAddress":{
                   "city":null,
@@ -536,7 +536,7 @@
                      "id":"807E1F06-B988-40CC-A336-45A4CA02698A",
                      "tickets":1,
                      "checkInDate":"2024-03-13T08:10:06.222Z",
-                     "checkOutDate":null,
+                     "checkOutDate":"2024-04-13T08:10:06.222Z",
                      "feeType":{
                         "id":"36CD501D-295F-413C-9405-D98ED8892A3D",
                         "name":"Opening Party",
@@ -557,12 +557,14 @@
                         "details":"The official Opening Party will be held after day one of AOG Energy. This is your opportunity to connect with leaders of the industry, colleagues, and clients in a relaxed garden party setting. Don’t miss the entertainment, food, and drinks. The more the merrier!"
                      },
                      "paymentDetails":{
-                        "paymentStatus":"GUEST_OF",
-                        "discountAmount":0,
-                        "adjustmentAmount":0,
+                        "paymentStatus":"PURCHASE",
+                        "discountAmount":10,
+                        "adjustmentAmount":10,
                         "taxAmount":0,
-                        "totalChargeAmount":0,
-                        "discountCode":null
+                        "totalChargeAmount":100,
+                        "discountCode":{
+                           "code":"A024"
+                        }
                      }
                   },
                   {
@@ -590,7 +592,7 @@
                         "details":"The official Opening Party will be held after day one of AOG Energy. This is your opportunity to connect with leaders of the industry, colleagues, and clients in a relaxed garden party setting. Don’t miss the entertainment, food, and drinks. The more the merrier!"
                      },
                      "paymentDetails":{
-                        "paymentStatus":"GUEST_OF",
+                        "paymentStatus":"PURCHASE",
                         "discountAmount":0,
                         "adjustmentAmount":0,
                         "taxAmount":0,

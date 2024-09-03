@@ -6,8 +6,9 @@ public class ImportRegistartionControllerTest {
         // Create a custom Event record for testing
         
 		 Test.setMock(HttpCalloutMock.class, setStaticMock('importregistrationMock'));
-       
-        Event__c testEvent = new Event__c(Name = 'Test Event', EventsAirID__c = '12345',Event_Portfolio__c = 'Food',Event_Category__c = 'Naturally Good',Is_Pricebook_Created__c=false );
+               RecordType rt = [SELECT Id,Name FROM RecordType WHERE SObjectType = 'Event__c' AND Name = 'Trade Show' LIMIT 1];
+
+        Event__c testEvent = new Event__c(Name = 'Test Event', EventsAirID__c = '12345',RecordTypeId = rt.Id,Event_Portfolio__c = 'Food',Event_Category__c = 'Naturally Good',Is_Pricebook_Created__c=false );
         system.debug('testEvent'+testEvent);
         insert testEvent;
         
@@ -22,6 +23,9 @@ public class ImportRegistartionControllerTest {
         acc.Name = 'Test account - 2';
         acc.Domain_Name__c = 'gmail.com';
         insert acc;
+        Account acc1 = new Account();
+        acc1.Name = 'Cleanup Services';
+        insert acc1;
         
         contact con = new Contact();
         con.Email = 'vandana@gmail.com';
@@ -37,44 +41,39 @@ public class ImportRegistartionControllerTest {
         ld.Event_Category__c = 'Naturally Good';
         ld.Company = 'Unknown';
         insert ld;
-        
-        
-        
-        
-         Pricebook2 pb1 = new Pricebook2();
-        pb1.Name = 'vandanaTest';
-        pb1.Events__c = testEvent.id;
-        insert pb1;
-        
-        List<Pricebook2> lstofpricebook = new List<Pricebook2>();
-        
-        Pricebook2 pb = new Pricebook2();
-        pb.Name = 'vandanaTest';
-       // pb.Events__c = testEvent.id;
-        //pb.isStandard = true;
-        lstofpricebook.add(pb);
-        insert lstofpricebook;
-        
+        // Pricebook2 pb1 = new Pricebook2();
+// pb1.Name = 'vandanaTest';
+// pb1.Events__c = testEvent.id;
+// insert pb1;
+
+// List<Pricebook2> lstofpricebook = new List<Pricebook2>();
+
+// Pricebook2 pb = new Pricebook2();
+// pb.Name = 'vandanaTest';
+// // pb.Events__c = testEvent.id;
+// //pb.isStandard = true;
+// lstofpricebook.add(pb);
+// insert lstofpricebook;
         Pricebook2 standardPricebook = new Pricebook2(Id =Test.getStandardPricebookId(),IsActive = true);
-update standardPricebook;
+		update standardPricebook;
         
       
         
-          Product2 objProduct2=new Product2();
-        objProduct2.Name='SSP - Comprehensive - E';
-        objProduct2.ProductCode = 'Pro-D';
-        insert objProduct2;
+          // Product2 objProduct2=new Product2();
+//         objProduct2.Name='SSP - Comprehensive - E';
+//         objProduct2.ProductCode = 'Pro-D';
+//         insert objProduct2;
         
-        List<Pricebook2> objPricebook = [Select id,Name from PriceBook2 where isStandard =: true];
-        Id standardPB = Test.getStandardPricebookId();  
+//         List<Pricebook2> objPricebook = [Select id,Name from PriceBook2 where isStandard =: true];
+//         Id standardPB = Test.getStandardPricebookId();  
         
-        PricebookEntry objpricebookentry =new PricebookEntry();
-        objpricebookentry.Product2ID = objProduct2.id;
-        objpricebookentry.UnitPrice=23.50;
-        objpricebookentry.UseStandardPrice=false;
-        objpricebookentry.Pricebook2ID=standardPB;
-        objpricebookentry.isActive=true;
-        insert objpricebookentry;
+//         PricebookEntry objpricebookentry =new PricebookEntry();
+//         objpricebookentry.Product2ID = objProduct2.id;
+//         objpricebookentry.UnitPrice=23.50;
+//         objpricebookentry.UseStandardPrice=false;
+//         objpricebookentry.Pricebook2ID=standardPB;
+//         objpricebookentry.isActive=true;
+//         insert objpricebookentry;
         ApexPages.StandardController controller = new ApexPages.StandardController(testEvent);
 
         Test.startTest();

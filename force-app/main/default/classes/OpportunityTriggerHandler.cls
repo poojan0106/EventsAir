@@ -9,7 +9,7 @@ public with sharing class OpportunityTriggerHandler {
     private static Boolean isCornerUpdateDone = false;
 
     public void doBeforeUpdate(List<Opportunity> newOpportunityList, Map<Id, Opportunity> newOpportunityMap, Map<Id, Opportunity> oldOpportunityMap) {
-        system.debug('@newOpportunityList'+newOpportunityList[0].name);
+        
         validateOnChangeToNegotiation(newOpportunityList, oldOpportunityMap);
         populateAccountPrimaryContact(newOpportunityList, newOpportunityMap, oldOpportunityMap);
     }

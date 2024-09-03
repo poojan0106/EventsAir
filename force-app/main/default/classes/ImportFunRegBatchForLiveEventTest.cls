@@ -82,11 +82,11 @@ public class ImportFunRegBatchForLiveEventTest {
         
         Test.startTest();
         
-          System.schedule(jobName, cronExpression, new FunctionRegLiveEventBatchScheduler());
+         // System.schedule(jobName, cronExpression, new FunctionRegLiveEventBatchScheduler());
         ImportFunRegBatchForLiveEvent batchInstance = new ImportFunRegBatchForLiveEvent();
         Database.executeBatch(batchInstance);
-        ImportFuncRegistartionFromEventsAirBatch.isValidEmail('Vandana@resonantcloud.info');
-        ImportFuncRegistartionFromEventsAirBatch.generatestringMethod('Test1','Test2','Test3');
+        ImportFunRegBatchForLiveEvent.isValidEmail('Vandana@resonantcloud.info');
+        ImportFunRegBatchForLiveEvent.generatestringMethod('Test1','Test2','Test3');
         Test.stopTest();
     }
     

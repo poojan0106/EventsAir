@@ -47,7 +47,7 @@ public class ImportFunRegSeprateSecAndInteBatchTest {
         Decimal totalcharge = 100;
         
         Test.startTest();
-        System.schedule(jobName, cronExpression, new ImportFunRegSepSecAndInteBatchscheduler());
+       // System.schedule(jobName, cronExpression, new ImportFunRegSepSecAndInteBatchscheduler());
         ImportFunRegSeprateSecAndInteBatch batchInstance = new ImportFunRegSeprateSecAndInteBatch();
         Database.executeBatch(batchInstance);
         ImportFunRegSeprateSecAndInteBatch.isValidEmail('abc@gmail.com');

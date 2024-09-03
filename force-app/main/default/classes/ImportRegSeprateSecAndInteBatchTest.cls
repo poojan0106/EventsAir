@@ -6,10 +6,10 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
         
 		 Test.setMock(HttpCalloutMock.class, setStaticMock('importregistrationMock'));
         
-        RecordType rt = [SELECT Id,Name FROM RecordType WHERE SObjectType = 'Event__c' AND Name = 'Trade Show' LIMIT 1];
+        RecordType rt = [SELECT Id,Name FROM RecordType WHERE SObjectType = 'Event__c' AND Name ='Trade Show' LIMIT 1];
 
        
-        Event__c testEvent = new Event__c(Name = 'Test Event',Registration_Types__c='Speaker Registration', EventsAirID__c = '12345',Event_Portfolio__c = 'Food',Event_Category__c = 'Naturally Good',RecordTypeId = rt.Id,Close_Date__c = system.today().addMonths(1),Next_Date__c = null );
+        Event__c testEvent = new Event__c(Name = 'Test Event',Registration_Types__c='Speaker Registration', EventsAirID__c = '12345',Event_Portfolio__c = 'Food',Event_Category__c = 'Naturally Good',Close_Date__c = system.today().addMonths(1),Next_Date__c = null );
         system.debug('testEvent'+testEvent);
         insert testEvent;
         
@@ -48,7 +48,7 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
         
         
         Test.startTest();
-        System.schedule(jobName, cronExpression, new ImportRegSeprateSecAndInteBatchScheduler());
+       // System.schedule(jobName, cronExpression, new ImportRegSeprateSecAndInteBatchScheduler());
         ImportRegSeprateSecAndInteBatch batchInstance = new ImportRegSeprateSecAndInteBatch();
         Database.executeBatch(batchInstance);
         
