@@ -1206,7 +1206,7 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
                             System.debug('@@@ eventregPaymentdetail ='+eventregPaymentdetails.get('taxAmount') );
                             oli.EventsAir_Tax__c = (Decimal) eventregPaymentdetails.get('taxAmount');
                             oli.EventsAir_Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');
-                            oli.Function_Registration_Id__c = funregid;
+                            
                             oli.EventsAir_Regisration_ID__c = funregid;
                             if(Finalstring != null && Finalstring != '') {
                     
@@ -1224,30 +1224,30 @@ objreg.EventsAir_Function_Id__c =  mapOfFunctandSfId.get(FunctionId);
         }
         
         if(!lstInsertOppProduct.isEmpty()) {
-            //Database.upsert(lstInsertOppProduct, OpportunityLineItem.Function_Registration_Id__c, false);
+            //Database.upsert(lstInsertOppProduct, OpportunityLineItem.EventsAir_Regisration_ID__c, false);
             
             Map<String, Id> mapOfEvnOLIandSfId = new Map<String, Id>();
             set<String> setOfEvnOLIIds = new set<String>();
             
             for(OpportunityLineItem oli: lstInsertOppProduct) {
-                setOfEvnOLIIds.add(oli.Function_Registration_Id__c);
+                setOfEvnOLIIds.add(oli.EventsAir_Regisration_ID__c);
             }
             
             //do soql on con to fetch data based on eventsair contact id
-            List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c
+            List<OpportunityLineItem> lstexistingOlis = [SELECT Id, EventsAir_Regisration_ID__c
                                                          FROM OpportunityLineItem 
-                                                         WHERE Function_Registration_Id__c IN: setOfEvnOLIIds];
+                                                         WHERE EventsAir_Regisration_ID__c IN: setOfEvnOLIIds];
             
             if(lstexistingOlis.size() > 0) {
                 for(OpportunityLineItem existingoli: lstexistingOlis) {
-                    mapOfEvnOLIandSfId.put(existingoli.Function_Registration_Id__c, existingoli.Id);
+                    mapOfEvnOLIandSfId.put(existingoli.EventsAir_Regisration_ID__c, existingoli.Id);
                 }
             }
             
             List<OpportunityLineItem> finallisttoinsertoli= new List<OpportunityLineItem>();
             
             for(OpportunityLineItem newoli: lstInsertOppProduct) {
-                if(!mapOfEvnOLIandSfId.containskey(newoli.Function_Registration_Id__c)) {
+                if(!mapOfEvnOLIandSfId.containskey(newoli.EventsAir_Regisration_ID__c)) {
                     finallisttoinsertoli.add(newoli);
                 }
             }
@@ -1447,10 +1447,13 @@ return filteredContacts;
         }
         
         List<Registration__c> finallisttoinsertreg = new List<Registration__c>();
-        
+        List<Registration__c> listtoUpdatereg = new List<Registration__c>();
+
         for(Registration__c newreg: lstInsrtReg) {
             if(!mapOfEvnRegIdandSfRegId.containskey(newreg.EventsAir_Regisration_ID__c)) {
                 finallisttoinsertreg.add(newreg);
+            }else {
+                listtoUpdatereg.add(newreg);
             }
         }
         system.debug('finallisttoinsertreg'+finallisttoinsertreg.size());
@@ -1458,7 +1461,9 @@ return filteredContacts;
             system.debug('finallisttoinsertreg'+finallisttoinsertreg.size());
             insert finallisttoinsertreg ;
         }
-        
+        if (listtoUpdatereg.size() > 0) {
+            update finallisttoinsertreg;
+        }
     }
     public void insertProdAndServicesIfNotExist(List<Product_Service_Option__c> lstInsrtProdAndServices) {
         system.debug('insertProdAndServicesIfNotExist'+ lstInsrtProdAndServices.size());
@@ -1493,7 +1498,8 @@ return filteredContacts;
             insert finallisttoinsertProdAndService ;
         }
     }
-   /*public void LinkFunctionToRegistration(List<Registration__c> lstRegistration) {
+
+    public void LinkFunctionToRegistration(List<Registration__c> lstRegistration) {
         
         Set<String> setOfEventFunId = new Set<String>();
         List<Function__c> lstFunction;
@@ -1530,7 +1536,7 @@ return filteredContacts;
                 update lstupdtReg;
             }
         }
-    }*/
+    }
     
     
     // method to insert new Opportunity(no duplicates) in salesforce
@@ -1580,7 +1586,7 @@ return filteredContacts;
             }
         }
         
-        if(finallisttoinsertOpp.size() >0  && !test.isrunningtest()) {
+        if(finallisttoinsertOpp.size() >0 && !test.isrunningtest()) {
             insert finallisttoinsertOpp;
         }
         for(Opportunity newopp: finallisttoinsertOpp) {

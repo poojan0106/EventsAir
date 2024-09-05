@@ -1041,7 +1041,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             }
         }
         
-        if(finallisttoinsertOpp.size() >0  && !test.isrunningtest()) {
+        if(finallisttoinsertOpp.size() >0 && !test.isrunningtest()) {
             insert finallisttoinsertOpp;
         }
         for(Opportunity newopp: finallisttoinsertOpp) {
@@ -1369,7 +1369,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                             System.debug('@@@ eventregPaymentdetail ='+eventregPaymentdetails.get('taxAmount') );
                             oli.EventsAir_Tax__c = (Decimal) eventregPaymentdetails.get('taxAmount');
                             oli.EventsAir_Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');
-                            oli.Function_Registration_Id__c = funregid;
+                            
                             oli.EventsAir_Regisration_ID__c = funregid;
                             if(Finalstring != null && Finalstring != '') {
                     
@@ -1390,30 +1390,30 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         }
         
         if(!lstInsertOppProduct.isEmpty()) {
-            //Database.upsert(lstInsertOppProduct, OpportunityLineItem.Function_Registration_Id__c, false);
+            //Database.upsert(lstInsertOppProduct, OpportunityLineItem.EventsAir_Regisration_ID__c, false);
             
             Map<String, Id> mapOfEvnOLIandSfId = new Map<String, Id>();
             set<String> setOfEvnOLIIds = new set<String>();
             
             for(OpportunityLineItem oli: lstInsertOppProduct) {
-                setOfEvnOLIIds.add(oli.Function_Registration_Id__c);
+                setOfEvnOLIIds.add(oli.EventsAir_Regisration_ID__c);
             }
             
             //do soql on con to fetch data based on eventsair contact id
-            List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c
+            List<OpportunityLineItem> lstexistingOlis = [SELECT Id, EventsAir_Regisration_ID__c
                                                          FROM OpportunityLineItem 
-                                                         WHERE Function_Registration_Id__c IN: setOfEvnOLIIds];
+                                                         WHERE EventsAir_Regisration_ID__c IN: setOfEvnOLIIds];
             
             if(lstexistingOlis.size() > 0) {
                 for(OpportunityLineItem existingoli: lstexistingOlis) {
-                    mapOfEvnOLIandSfId.put(existingoli.Function_Registration_Id__c, existingoli.Id);
+                    mapOfEvnOLIandSfId.put(existingoli.EventsAir_Regisration_ID__c, existingoli.Id);
                 }
             }
             
             List<OpportunityLineItem> finallisttoinsertoli= new List<OpportunityLineItem>();
             
             for(OpportunityLineItem newoli: lstInsertOppProduct) {
-                if(!mapOfEvnOLIandSfId.containskey(newoli.Function_Registration_Id__c)) {
+                if(!mapOfEvnOLIandSfId.containskey(newoli.EventsAir_Regisration_ID__c)) {
                     finallisttoinsertoli.add(newoli);
                 }
             }
