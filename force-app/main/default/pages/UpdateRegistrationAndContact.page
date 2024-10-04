@@ -1,0 +1,2 @@
+<apex:page standardController="Event__c" extensions="UpdateImportRegistartionController" action="{!executeBatch}" >
+</apex:page>

@@ -111,6 +111,7 @@ public class ResponseWrapper {
         public Function function;
         public Datetime checkInDate;
         public Datetime checkOutDate;
+        public Datetime createdAt;
         public RegistrationPaymentDetails paymentDetails;
         public FunctionFeeType feeType;
     }
@@ -156,6 +157,7 @@ public class ResponseWrapper {
         public String id;
         public Datetime registrationDateTime;
         public Contact contact;
+         public Datetime createdAt;
         public RegistrationPaymentDetails paymentDetails;
         public RegistrationType type;
     }

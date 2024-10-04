@@ -38,7 +38,11 @@ public with sharing class OpportunityTriggerHandler {
             }
        
         getOpptyIdWithParentOppty(newOpportunityList);
-        addPrimarySegmentToNewOpp(newOpportunityList);
+         
+        if (!setOfRecordType.contains('Divcom Visitor') && !setOfRecordType.contains('Mumbrella Visitor')) {
+    		addPrimarySegmentToNewOpp(newOpportunityList); 
+            }
+        
     }
 
     /************************************************************************************************************
@@ -392,7 +396,7 @@ public with sharing class OpportunityTriggerHandler {
 
         for (Opportunity newOpportunity : newOpportunityList) {
             if (!newOpportunity.Is_Withdrawal__c && newOpportunity.Co_Exhibitor_Opportunity__c == null && 
-                newOpportunity.StageName != Label.Opportunity_Stage_Closed_Won && newOpportunity.StageName != Label.Opportunity_Stage_Closed_Lost && 
+                newOpportunity.StageName != Label.Opportunity_Stage_Closed_Won && newOpportunity.StageName != Label.Opportunity_Stage_Cooling_Off && newOpportunity.StageName != Label.Opportunity_Stage_Closed_Lost && 
                 newOpportunity.isClosed == false && newOpportunity.StageName != Label.Opportunity_Stage_Pending_Change) {
 
                 if (isInsert) {
@@ -730,6 +734,7 @@ public with sharing class OpportunityTriggerHandler {
         for (Opportunity newOpportunity : filteredOpportunitiesList) {
             if (newOpportunity.Parent_Upgrade_Opportunity__c != null && newOpportunity.Type == Label.Opportunity_Type_Upgrade && 
                 newOpportunity.Parent_Upgrade_Opportunity__r.StageName != Label.Opportunity_Stage_Closed_Won && 
+newOpportunity.StageName != Label.Opportunity_Stage_Cooling_Off &&
                 newOpportunity.Parent_Upgrade_Opportunity__r.StageName != Label.Opportunity_Stage_Closed_Lost) {
 
                 if (newOpportunity.StageName != oldOpportunityMap.get(newOpportunity.Id).StageName) {
@@ -974,7 +979,8 @@ public with sharing class OpportunityTriggerHandler {
         for (Opportunity newOpportunity : newOpportunityList) {
 
             if (!newOpportunity.Is_Withdrawal__c && newOpportunity.Co_Exhibitor_Opportunity__c == null
-                    && newOpportunity.StageName != Label.Opportunity_Stage_Closed_Won && newOpportunity.StageName != Label.Opportunity_Stage_Closed_Lost
+                    && newOpportunity.StageName != Label.Opportunity_Stage_Closed_Won && 
+newOpportunity.StageName != Label.Opportunity_Stage_Cooling_Off && newOpportunity.StageName != Label.Opportunity_Stage_Closed_Lost
                     && newOpportunity.isClosed == false && newOpportunity.StageName != Label.Opportunity_Stage_Pending_Change) {
 
                 if (isInsert) {
