@@ -85,7 +85,6 @@ public class ImportFunRegBatchForLiveEventTest {
          // System.schedule(jobName, cronExpression, new FunctionRegLiveEventBatchScheduler());
         ImportFunRegBatchForLiveEvent batchInstance = new ImportFunRegBatchForLiveEvent();
         Database.executeBatch(batchInstance);
-        ImportFunRegBatchForLiveEvent.isValidEmail('Vandana@resonantcloud.info');
         ImportFunRegBatchForLiveEvent.generatestringMethod('Test1','Test2','Test3');
         Test.stopTest();
     }

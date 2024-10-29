@@ -14,14 +14,14 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     Integer contactsLimit = Integer.valueOf(System.Label.EventsAir_Attendee_Contact_Limit);
     Integer regLimit = Integer.valueOf(System.Label.EventsAir_Registartion_Limit);
     List<Contact> lstInsrtCon;
-    List<Lead> lstInsrtLead;    
-    List<Product_Service_Option__c> lstInsrtProdAndServices; 
-    List<Function__c> lstInsrtFun;     
-    Map<String, Id> mapOfLeadStringAndId = new Map<String, Id>();   
+    List<Lead> lstInsrtLead;
+    List<Product_Service_Option__c> lstInsrtProdAndServices;
+    List<Function__c> lstInsrtFun;
+    Map<String, Id> mapOfLeadStringAndId = new Map<String, Id>();
     Map<String, Id> mapOfContactStringAndId = new Map<String, Id>();
     Map<String, Id> mapOfEventregTypeAndSFproId = new Map<String, Id>();
     Set<String> setofProductId = new Set<String>();
-     Map<String, Id> mapOfEvnproandSfId = new Map<String, Id>();
+    Map<String, Id> mapOfEvnproandSfId = new Map<String, Id>();
     Map<String, Id> mapOfEventRegTypeIdAndSFPBentryId = new Map<String, Id>();
     Map<String, Decimal> mapOfEventRegTypeIdAndSFPBentryPrice = new Map<String, Decimal>();
     String RecordType;
@@ -36,10 +36,8 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
         
-        System.debug('%%% strEventId = '+strEventId);
         List<Event__c> eventData = [Select Id,Name,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
         RecordType = eventData[0].RecordType.Name;
-        System.debug('%%% lstcustsett[0].Offset__c = '+lstcustsett[0].Offset__c);
         //get access token
         String strtoken = EventsAirOAuthTokenRequest.getAccessToken(RecordType);
         String graphqlQuery;
@@ -208,7 +206,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         request.setHeader('Authorization', 'Bearer ' + strtoken);
         
         HttpResponse response = http.send(request);
-        System.debug('@@@e@ respons = '+response.getBody());
+        System.debug('@@@@ response = '+response.getBody());
         
         List<ResponseWrapper> lstofresponseWrapper = new List<ResponseWrapper>();
         ResponseWrapper responseWrapper = new ResponseWrapper();
@@ -246,44 +244,49 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         //***  create pricebook if Is_Pricebook_Created__c is false on event *** 
         List<Event__c> lstevent = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, New_Event_Logo__c, Is_Pricebook_Created__c,Event_Category__c
                                    FROM Event__c
-                                   WHERE EventsAirID__c =: strEventId  Order By CreatedDate DESC LIMIT 1];
+                                   WHERE Id =: sfeventId  Order By CreatedDate DESC LIMIT 1];
         List<Event__c> updteventlst = new List<Event__c>(); 
         List<Pricebook2> lstInsrtPricebook = new List<Pricebook2>();
+        List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId];
         String evtStartDate = (String) eventmap.get('startDate');
         String evtCloseDate = (String) eventmap.get('endDate');
         Map<String, Object> logoMap = (Map<String, Object>) eventmap.get('logo');
         String evtLogo = logoMap != null ? (String) logoMap.get('url') : null;
 
         if (eventmap != null && !lstevent.isEmpty()) {  
-            eventCategory = lstevent[0].Event_Category__c;
-            if(lstevent[0].Is_Pricebook_Created__c == false) {
+            if(lstevent[0].Event_Category__c != null){
+                eventCategory = lstevent[0].Event_Category__c;
+            }
+            if(lstevent[0].Is_Pricebook_Created__c == false || (lstevent[0].Is_Pricebook_Created__c == true && lstPriceook.size() == 0)) {
                 //Pricebook2 field mapping
                 Pricebook2 newPricebook = new Pricebook2();
                 newPricebook.Name = (String) eventmap.get('name')+' Visitor'; 
-                newPricebook.Events__c = lstevent[0].Id;
+                newPricebook.Events__c = sfeventId;
                 newPricebook.Description = 'Description of the pricebook'; 
                 newPricebook.IsActive = true; // Set the pricebook as active
                 lstInsrtPricebook.add(newPricebook);
                 lstevent[0].Is_Pricebook_Created__c = true; //make is created pricebook checkbox to true on event
-            }                           
-            lstevent[0].Event_Logo__c = evtLogo;
+            }         
+            if(evtLogo != null) {
+                lstevent[0].Event_Logo__c = evtLogo;
+            }            
+            if (evtStartDate != null) {
+                lstevent[0].Open_Date__c = (Datetime) JSON.deserialize('"' + evtStartDate + '"', Datetime.class);     
+            }
+            if (evtCloseDate != null) {
+                lstevent[0].Close_Date__c = (Datetime) JSON.deserialize('"' + evtCloseDate + '"', Datetime.class);     
+            }  
             updteventlst.add(lstevent[0]);
         }
         
         if (!updteventlst.isEmpty()) {     
-            if (evtStartDate != null) {
-                updteventlst[0].Open_Date__c = (Datetime) JSON.deserialize('"' + evtStartDate + '"', Datetime.class);     
-            }
-            if (evtCloseDate != null) {
-                updteventlst[0].Close_Date__c = (Datetime) JSON.deserialize('"' + evtCloseDate + '"', Datetime.class);     
-            }      
             update updteventlst;              
         }  
         
         if(!lstInsrtPricebook.isEmpty()) {
             insert lstInsrtPricebook;
         }
-        
+
         List<Object> lsteventsairContacts = new List<Object>();
         if(eventmap != null){
            lsteventsairContacts = (List<Object>) eventmap.get('contacts'); //extract list of contas from event query
@@ -291,11 +294,10 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         System.debug('### lsteventsairContacts size = '+lsteventsairContacts.size());
         if(lsteventsairContacts.size()>0){
              createRecords(lsteventsairContacts);
-        }
-       
+        }       
         
-        if(lsteventsairContacts.isEmpty() && lsteventsairContacts.isEmpty()) {
-            //update offset in custom setting
+        if(lsteventsairContacts.isEmpty()) {
+            //Update the offset in the custom setting to exit from the recursive batch.
             System.debug('@@@ All Data Synced');
             lstcustsett[0].Is_Execute_Next__c = false; //This is used to stop batch to run in recursion
             lstcustsett[0].Offset__c = 0;
@@ -310,10 +312,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         lstInsrtProdAndServices = new List<Product_Service_Option__c>();
         Set<String> setOfDomainName = new Set<String>();
         Map<String, Id> mapOfDomainNameAndAccId = new Map<String, Id>();
-        Map<String, Id> mapOfOrganizationNameAndAccId = new Map<String, Id>();
         Map<String, Id> mapOfDomainNameAndAccOwnerId = new Map<String, Id>();
         Set<String> AccountNamesForCheckCreation = new Set<String>();
-        Set<String> accNeedToCreatePreName = new Set<String>();
+        Map<String, String> accNeedToCreatePreName = new Map<String, String>();
 
         //Loop through event's air contacts data to extract contact's email domain name
         for(Object objeventcon: lsteventsairContacts) {
@@ -322,42 +323,41 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             String strevntconemail = (String) eventconmap.get('primaryEmail');
             String orgNameForAccCreation = (String) eventconmap.get('organizationName');
             String orgNameOfAccountInSF;  //  used for check account name in salesforce
-            String domainNameOfNullOrganizationNameInResponse;
-            
-            // fill the list (" setOfDomainName ") of all Contact's domain name and another list (" domainNameOfNullOrganizationNameInResponse ") for domain for COntact's where organization name is null
+            String domainname;
+
+            //add contact's domain name into set
             if(strevntconemail != null && strevntconemail != '') {
-                    String[] emailparts = strevntconemail.split('@');
-                    if (emailparts.size() > 1) {
-                        setOfDomainName.add(emailparts[1].trim().toLowerCase());
-                        domainNameOfNullOrganizationNameInResponse = emailparts[1].trim().toLowerCase();
+                String[] emailparts = strevntconemail.split('@');
+                if (emailparts.size() > 1) {
+                    setOfDomainName.add(emailparts[1].trim().toLowerCase());
+                    
+                    if (orgNameForAccCreation == null || orgNameForAccCreation == '') {
+                        AccountNamesForCheckCreation.add(emailparts[1].trim().toLowerCase());
+                        accNeedToCreatePreName.put(domainname, domainname);
                     }
-            }else {
+                }
+            }
+           /* else {
+                //add contact's organization name into set if con's domain name is null
                 if(orgNameForAccCreation != null && orgNameForAccCreation != ''){
                     if (orgNameForAccCreation.length() > 80) {
                         orgNameOfAccountInSF = (orgNameForAccCreation.length() > 80) ? orgNameForAccCreation.substring(0, 80) : orgNameForAccCreation;    
                     } else{
                         orgNameOfAccountInSF = orgNameForAccCreation;
                     }
-                    // fill the list (" accNeedToCreatePreName ") for adding all current response contact organizationNames which primaryemail is null
                     accNeedToCreatePreName.add(orgNameOfAccountInSF.toLowerCase());
                 }
-            }
+            } */
 
-            // fill the list (" AccountNamesForCheckCreation ") for adding all organization name for fetch account based on Organization name from Salesforce
+            // adding all organization name to the list and fetch account based on Organization name from Salesforce
             if(orgNameForAccCreation != null && orgNameForAccCreation != ''){
                 if (orgNameForAccCreation.length() > 80) {
                     orgNameOfAccountInSF = (orgNameForAccCreation.length() > 80) ? orgNameForAccCreation.substring(0, 80) : orgNameForAccCreation;    
                 } else{
                     orgNameOfAccountInSF = orgNameForAccCreation;
                 }
+                accNeedToCreatePreName.put(orgNameOfAccountInSF.toLowerCase(), domainname);
                 AccountNamesForCheckCreation.add(orgNameOfAccountInSF.toLowerCase());
-            }else {
-                if (domainNameOfNullOrganizationNameInResponse != '' && domainNameOfNullOrganizationNameInResponse != null) {
-                        // fill the list (" AccountNamesForCheckCreation ") for adding the domain name in the list to get accounts from SF based on domain name because it has no organization Name
-                        AccountNamesForCheckCreation.add(domainNameOfNullOrganizationNameInResponse.toLowerCase());
-                }else {
-                    System.debug('Organization Name and domain both are null which is not preferable');
-                }
             }
         }
 
@@ -365,21 +365,30 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         System.debug('AccountNamesForCheckCreation :-'+ AccountNamesForCheckCreation);
         System.debug('AccountNamesForCheckCreation size :-'+ AccountNamesForCheckCreation.size());
 
-        // remove those account name from the list (" accNeedToCreatePreName ") where it is already created before
+        //remove those account name from the list where it is already created before
         if (accNeedToCreatePreName.size() > 0) {
-            List<Account> newCreateAccListOfOrgNames = [SELECT Id,Name,Domain_Name__c From Account Where Name IN :accNeedToCreatePreName  AND Account_Status__c != 'Inactive' and On_Hold__c = false];
-            List<String> existingOrgNameInSfAccRecords = new List<String>();
+            List<Account> newCreateAccListOfOrgNames = [SELECT Id, Name, Domain_Name__c FROM Account 
+                                                        WHERE Name IN :accNeedToCreatePreName.keySet()  AND 
+                                                        Account_Status__c != 'Inactive' AND On_Hold__c = FALSE];
 
+            List<Account> existingAccountsWithDomainName = [SELECT Id, Name,Domain_Name__c FROM Account WHERE Domain_Name__c IN :setOfDomainName AND Account_Status__c != 'Inactive' and On_Hold__c = false];
+  
             if(newCreateAccListOfOrgNames.size() > 0){
                 for(Account acc : newCreateAccListOfOrgNames){
                     accNeedToCreatePreName.remove(acc.Name.toLowerCase());
                 }
             }
-        }    
 
-        // remove those account name from the list (" accNeedToCreatePreName ") which contact has no paid registrations because we not need to create an account for those record
+            if(existingAccountsWithDomainName.size() > 0){
+                for(Account acc : existingAccountsWithDomainName){
+                    accNeedToCreatePreName.remove(acc.Name.toLowerCase());
+                }
+            }
+        }
+
+        // remove those account name from the list (" accNeedToCreatePreName ") which contact has unpaid registrations 
         if(accNeedToCreatePreName.size() > 0){
-            // Loop over each contact
+            // Loop over each contact to check if registartion is paid or unpaid
             for(Object objeventcon: lsteventsairContacts) {
                 Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;
                 List<Object> lsteventsairReg = (List<Object>) eventconmap.get('registrations');
@@ -414,7 +423,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                     }  
                 }
                 if(!hasCharge){
-                    accNeedToCreatePreName.remove(orgNameOfAccountInSF.toLowerCase());
+                    if (orgNameOfAccountInSF != null && orgNameOfAccountInSF != '') {
+                        accNeedToCreatePreName.remove(orgNameOfAccountInSF.toLowerCase());
+                    }
                 } 
             }
         }
@@ -423,7 +434,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         if (accNeedToCreatePreName.size() > 0) {
             List<Account> listAccPreCreate = new List<Account>();
 
-            for(String accName: accNeedToCreatePreName) {
+            for(String accName: accNeedToCreatePreName.keySet()) {
 
                 Account newAccount = new Account();
                 if (RecordType == 'Mumbrella') {
@@ -437,6 +448,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                     newAccount.Name = 'UNKNOWN';
                 }
                 newAccount.AccountSource = 'EventsAir';
+                newAccount.Domain_Name__c = accNeedToCreatePreName.get(accName);
                 listAccPreCreate.add(newAccount);
             }
             if (listAccPreCreate.size() > 0) {
@@ -447,13 +459,13 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         
 
         //create map for if domain not match check for account name with organization name of event's Air data
-        Map<String, String> MapOfexistingAccountsOrgNameAndAccount = new Map<String, String>();
+        Map<String, String> MapOfexistingAccountsOrgNameAndAccountId = new Map<String, String>();
         if (AccountNamesForCheckCreation != null) {
             List<Account> exitingAccListOfOrgNames = [SELECT Id,Name,Domain_Name__c From Account Where Name IN :AccountNamesForCheckCreation  AND Account_Status__c != 'Inactive' and On_Hold__c = false];
         
             for (Account acct : exitingAccListOfOrgNames) {
                 // map of organization name and accountId based on organization name for mapping with contact
-                MapOfexistingAccountsOrgNameAndAccount.put(acct.Name.toLowerCase(),acct.Id);
+                MapOfexistingAccountsOrgNameAndAccountId.put(acct.Name.toLowerCase(),acct.Id);
             }
         }
 
@@ -481,16 +493,6 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             }
         }
 
-        Map<String, Account> existingAccountsMapForDomainName = new Map<String, Account>();
-        List<Account> accountToInsertList = new List<Account>();
-
-        // Retrieve existing Accounts
-        List<Account> existingAccounts = [SELECT Id, Name,Domain_Name__c FROM Account WHERE Domain_Name__c IN :setOfDomainName AND Account_Status__c != 'Inactive' and On_Hold__c = false];
-        for (Account acc : existingAccounts) {
-            // fill this map of exiting domain name and account and use it for create new account for paid registrations
-            existingAccountsMapForDomainName.put(acc.Domain_Name__c.toLowerCase(), acc);
-        }
-
         // fill the list of firstname + lastName + email for fetch lead and contact based on combined string
         Set<String> setOfCombinedEventsAirAttendee = new Set<String>(); 
         for (Object objeventcon : lsteventsairContacts) {
@@ -499,7 +501,8 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         }
         
         // fetch contact from sf based on combined String
-        List<Contact> checkforUnpaidRegis = [Select Id,FirstName, LastName,Email,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];
+        List<Contact> checkforUnpaidRegis = [SELECT Id, FirstName, LastName, Email, CombinedString__c FROM Contact
+                                             WHERE CombinedString__c in :setOfCombinedEventsAirAttendee];
         Map<String, Contact> mapOfContactStringAndContact = new Map<String, Contact>();
             
         //loop through existing Contacts and fill the map to use for mapping with registration
@@ -508,7 +511,8 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         }
 
         // fetch Lead from sf based on combined String
-        List<Lead> checkforUnpaidLeads = [Select Id,FirstName, LastName,Email,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
+        List<Lead> checkforUnpaidLeads = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead
+                                          WHERE CombinedString__c in :setOfCombinedEventsAirAttendee];
         Map<String, Lead> mapOfLeadStringAndLead = new Map<String, Lead>();
             
         //loop through existing Leads and fill the map to use for mapping with registration
@@ -545,14 +549,15 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                 }
             }
 
-            for(Object reg : lsteventsairReg){
+            for(Object reg : lsteventsairReg) {
+                
                 Map<String, Object> eventReg = (Map<String, Object>) reg;
                 Map<String, Object> eventregPaymentdetails = (Map<String, Object>) eventReg.get('paymentDetails');
                 Decimal totalcharge = (Decimal) eventregPaymentdetails.get('totalChargeAmount');
                 String CombinedString = getCombinedString(objeventcon);
                 
                 // check for paid registration and it is not created before in salesforce than create contact and account
-                if(totalcharge > 0 && !mapOfContactStringAndContact.containsKey(CombinedString)){
+                if(totalcharge > 0 && !mapOfContactStringAndContact.containsKey(CombinedString)) {
 
                     Contact objcon = new Contact();
                     objcon.RecordTypeId = Schema.SObjectType.Contact.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();  
@@ -616,33 +621,14 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                     //create contact if found the exiting account based on domain name and create account and contact if not found                        
                     if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
                         objcon.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-                    }else if(MapOfexistingAccountsOrgNameAndAccount.containsKey(orgNameForMap)){
-                            System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccount.get(orgNameForMap));
-                            objcon.AccountId = MapOfexistingAccountsOrgNameAndAccount.get(orgNameForMap);
-                    }else{
-                        if (!existingAccountsMapForDomainName.containsKey(strAccdomainname)  && strAccdomainname != '' && strAccdomainname != null) {
-                            String orgName = (String) eventconmap.get('organizationName');
-                            Account newAccount = new Account();
-                            if (RecordType == 'Mumbrella') {
-                                newAccount.RecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId();
-                            } else {
-                                newAccount.RecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Diversified').getRecordTypeId();     
-                            }
-                            if(orgName != null && orgName != ''){
-                                newAccount.Name = (orgName.length() > 80) ? orgName.substring(0, 80) : orgName;
-                            }else{
-                                newAccount.Name = strAccdomainname;
-                            }
-                            newAccount.AccountSource = 'EventsAir';
-                            newAccount.Domain_Name__c = strAccdomainname;
-                            accountToInsertList.add(newAccount);
-                            existingAccountsMapForDomainName.put(newAccount.Domain_Name__c, newAccount); 
-                        }
+                    }else if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgNameForMap)){
+                        System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccountId.get(orgNameForMap));
+                        objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgNameForMap);
                     }
                     lstInsrtCon.add(objcon);
-
-                }else{
-                    // create lead if combined String is unpaid registration and it is not found in contact as well as lead
+                }
+                else{
+                    // create lead if unpaid registration and it is not found in contact as well as lead
                     if(!mapOfContactStringAndContact.containsKey(CombinedString) && !mapOfLeadStringAndLead.containsKey(CombinedString)){
 
                         //create lead field mapping start
@@ -715,92 +701,78 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             }
         }
 
-            // Insert Accounts
-            Map<String, Id> MapOfDomainNameAndId = new Map<String, Id>();
-            if (!accountToInsertList.isEmpty()) {            
-                insert accountToInsertList;
-                for (Account acc : accountToInsertList) {
-                    MapOfDomainNameAndId.put(acc.Domain_Name__c.toLowerCase(), acc.Id);
-                    
-                }
-            }
-            // link new account and contact based on domain name of contact email
-            for (Contact con : lstInsrtCon) {
-                String ContactEmailDomainName;
-                if(con.Email != null && con.Email != '') {
-                    String[] emailparts = con.Email.split('@');
-                    if (emailparts.size() > 1) {
-                        ContactEmailDomainName = emailparts[1].trim().toLowerCase();
-                    }
-                }
-                if (ContactEmailDomainName != null && ContactEmailDomainName != '') {
-                    if (MapOfDomainNameAndId.containskey(ContactEmailDomainName)) {
-                        con.accountId = MapOfDomainNameAndId.get(ContactEmailDomainName);
-                    } 
-                }
-                if (con.Organization_Name__c != null && con.Organization_Name__c != '' ) {
-                    mapOfOrganizationNameAndAccId.put(con.Organization_Name__c.trim().toLowerCase() ,con.AccountId);     
-                }        
-            }
+        // Insert Contacts
+        if (!lstInsrtCon.isEmpty()) {            
+            insertContactsIfNotExist(lstInsrtCon, setOfCombinedEventsAirAttendee);   
+            system.debug('insertContactsIfNotExist');
+        }
 
-            // Insert Contacts
-            if (!lstInsrtCon.isEmpty()) {            
-                mapOfContactStringAndId = insertContactsIfNotExist(lstInsrtCon, setOfCombinedEventsAirAttendee);   
-                system.debug('insertContactsIfNotExist');
-            }else {
-                List<Contact> LstOfExtistingContact = [Select Id,FirstName, LastName,Email,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];            
-                //loop through existing Contacts and fill the map
-                for(Contact objContact :LstOfExtistingContact){
-                    mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id); 
-                }
-            }
+        List<Contact> LstOfExtistingContact = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Contact 
+                                                WHERE CombinedString__c in :setOfCombinedEventsAirAttendee];            
+        //loop through existing Contacts and fill the map
+        for(Contact objContact :LstOfExtistingContact){
+            mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id); 
+        }
+        
 
-            // Insert Lead
-            if (!lstInsrtLead.isEmpty()) {
-                mapOfLeadStringAndId = insertLeadsIfNotExist(lstInsrtLead, setOfCombinedEventsAirAttendee); 
-                system.debug('insertLeadsIfNotExist');
-            }else {
-                List<Lead> LstOfExtistingLead = [Select Id,FirstName, LastName,Email,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
+        // Insert Lead
+        if (!lstInsrtLead.isEmpty()) {
+            insertLeadsIfNotExist(lstInsrtLead, setOfCombinedEventsAirAttendee); 
+            system.debug('insertLeadsIfNotExist');
+        }
+
+            List<Lead> LstOfExtistingLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead 
+                                                WHERE CombinedString__c in :setOfCombinedEventsAirAttendee];
+        
+            //loop through existing leads and fill the map
+            for(Lead objLead :LstOfExtistingLead) {
+                mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
+            }
             
-                //loop through existing leads and fill the map
-                for(Lead objLead :LstOfExtistingLead){
-                    mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
-                }
-            }
+        
             // Loop through event's air contacts data to create Product & Services
             for(Object objeventcon : lsteventsairContacts) {
                 Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;
-                List<Object> lsteventsairRecMarket = (List<Object>) eventconmap.get('marketingRecords');
-                String strevntconId = (String) eventconmap.get('id');
+                List<Object> lsteventsairReg = ((List<Object>) eventconmap.get('registrations'));
+                if (lsteventsairReg.size() > 0) {
                 
-                for(Object objEventMarketing : lsteventsairRecMarket) {
-                    Map<String, Object> prodAndSerMap = (Map<String, Object>) objEventMarketing;
-
-                    // Map<String, Object> lsteventsairRecMarketTag = (Map<String, Object>) prodAndSerMap.get('tag');
-                    // System.debug('lsteventsairRecMarketTag :---->' + lsteventsairRecMarketTag);
-
-                    String prodAndServiceName = (String) prodAndSerMap.get('name');
+                    List<Object> lsteventsairRecMarket = (List<Object>) eventconmap.get('marketingRecords');
+                    String strevntconId = (String) eventconmap.get('id');
                     
-                    Product_Service_Option__c prodAndService = new Product_Service_Option__c();
-                    prodAndService.EventsAirMarketing_Record_ID__c = (String) prodAndSerMap.get('id');
-                    if(prodAndServiceName != null){
-                        if(prodAndServiceName.length() <= 80) {
-                            prodAndServiceName = prodAndServiceName.trim();
-                        } else {
-                            prodAndServiceName = prodAndServiceName.substring(0,80).trim();
-                        }
-                    }
-                    prodAndService.Name =  prodAndServiceName;
-                    prodAndService.Marketing_Value__c = (String) prodAndSerMap.get('value');
+                    for(Object objEventMarketing : lsteventsairRecMarket) {
+                        Map<String, Object> prodAndSerMap = (Map<String, Object>) objEventMarketing;
 
-                    string Finalstring = getCombinedString(objeventcon);
-                    if(Finalstring != null && Finalstring != '') {
-                        if(mapOfContactStringAndId.containsKey(Finalstring)) {
-                            prodAndService.Contact__c = mapOfContactStringAndId.get(Finalstring);
-                        }
-                    }
+                        // Map<String, Object> lsteventsairRecMarketTag = (Map<String, Object>) prodAndSerMap.get('tag');
+                        // System.debug('lsteventsairRecMarketTag :---->' + lsteventsairRecMarketTag);
 
-                    lstInsrtProdAndServices.add(prodAndService);         
+                        String prodAndServiceName = (String) prodAndSerMap.get('name');
+                        
+                        Product_Service_Option__c prodAndService = new Product_Service_Option__c();
+                        prodAndService.EventsAirMarketing_Record_ID__c = (String) prodAndSerMap.get('id');
+                        if(prodAndServiceName != null){
+                            if(prodAndServiceName.length() <= 80) {
+                                prodAndServiceName = prodAndServiceName.trim();
+                            } else {
+                                prodAndServiceName = prodAndServiceName.substring(0,80).trim();
+                            }
+                        }
+                        prodAndService.Name =  prodAndServiceName;
+                        prodAndService.Marketing_Value__c = (String) prodAndSerMap.get('value');
+
+                        string Finalstring = getCombinedString(objeventcon);
+                        if(Finalstring != null && Finalstring != '') {
+                            if(mapOfContactStringAndId.containsKey(Finalstring)) {
+                                prodAndService.Contact__c = mapOfContactStringAndId.get(Finalstring);
+                            }else{
+                                // connect with exiting or newly created lead
+                                if(mapOfLeadStringAndId.containsKey(Finalstring)) {
+                                    prodAndService.Lead__c = mapOfLeadStringAndId.get(Finalstring);
+                                }
+                            }
+                        }
+
+                        lstInsrtProdAndServices.add(prodAndService);         
+                    }
                 }
             }
             System.debug('lstInsrtProdAndServices from mumbrella:-->' + lstInsrtProdAndServices);   
@@ -883,9 +855,6 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                     }
                     
                     lstInsrtReg.add(objreg);
-                    
-                    // System.debug('@@@ isexecuted = '+isexecuted);
-                    // System.debug('@@@ totalcharge = '+totalcharge);
                     String OrganizationName;
                     if(eventconmap.get('organizationName') != null){
                         String orgName = (String) eventconmap.get('organizationName');
@@ -902,8 +871,8 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                             objOpp.Name = strOppName;
                             if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)){
                                 objOpp.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-                            }else if(mapOfOrganizationNameAndAccId.containsKey(OrganizationName)){
-                                objOpp.AccountId = mapOfOrganizationNameAndAccId.get(OrganizationName);
+                            }else if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(OrganizationName)){
+                                objOpp.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(OrganizationName);
                             }
 
                             if(mapOfDomainNameAndAccOwnerId.containsKey(strAccdomainname)){
@@ -912,7 +881,10 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                             
                             objOpp.Is_Private__c = false;  
                             objOpp.LeadSource = 'EventsAir';
-                            objOpp.Closedate = System.today();
+                            if(strRegDate != null) {
+                                objOpp.Closedate = Date.valueOF(strRegDate);
+                            }
+
                             if (RecordType == 'Mumbrella') {
                                 objOpp.RecordTypeId = Schema.SObjectType.Opportunity.getRecordTypeInfosByDeveloperName().get('Mumbrella_Visitor').getRecordTypeId();                          
                             } else {
@@ -934,8 +906,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             
             insertRegistrationIfNotExist(lstInsrtReg);
             insertOpportunityIfNotExist(lstInsrtOpp);
-            createOpportunityProduct(lsteventsairContacts, lstInsrtOpp);
-            
+            createOpportunityProduct(lsteventsairContacts, lstInsrtOpp);        
     }
     
     public static String getCombinedString(Object objeventcon){
@@ -981,18 +952,18 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     }   
     
     // to insert only new Contacts if not exist in salesforce
-    public static Map<String, Id> insertContactsIfNotExist(List<Contact> contactsToInsert , Set<String> setOfCombinedEventsAirAttendee) {
+    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Set<String> setOfCombinedEventsAirAttendee) {
 
          //fetch existing Contacts based on Combined name and email
         List<Contact> LstOfExtistingContact = [Select Id,FirstName, LastName,Email,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];
-        Map<String, Id> mapOfContactStringAndId = new Map<String, Id>();
+        Map<String, Id> mapOfContactStringAndIds = new Map<String, Id>();
         
         //loop through existing Contacts and fill the map
         for(Contact objContact :LstOfExtistingContact){
-           mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id); 
+           mapOfContactStringAndIds.put(objContact.CombinedString__c, objContact.Id); 
         }
 
-        List<Contact> ListOfContactToInsert = new List<Contact>();
+        // List<Contact> ListOfContactToInsert = new List<Contact>();
         List<Contact> FinalListOfContactToInsert = new List<Contact>();
         // List<Contact> ListOfContactToUpdate = new List<Contact>();
         // Set<String> setOfCurrentContactCombinedDataToCheckForUpdate = new Set<String>();
@@ -1002,21 +973,18 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
              String strcombinedEventsAirAttendee= objcontact.FirstName+objcontact.LastName+objcontact.Email; 
             strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
             
-            //check if lead exist or not
-            if(!mapOfContactStringAndId.ContainsKey(strcombinedEventsAirAttendee)){
+            if(!mapOfContactStringAndIds.ContainsKey(strcombinedEventsAirAttendee)){
                 // this is for check current batch duplicate data
                 if(!setOfCurrentContactCombinedData.contains(strcombinedEventsAirAttendee)){
-                     ListOfContactToInsert.add(objcontact);
+                    //  ListOfContactToInsert.add(objcontact);
+                    FinalListOfContactToInsert.add(objcontact);
                     setOfCurrentContactCombinedData.add(strcombinedEventsAirAttendee);
-                }
-                else{
-                    system.debug('contact alreaded added');
                 }
             }
             // else{
             //     system.debug('contact already exist in Salesforce');
             //     if(!setOfCurrentContactCombinedDataToCheckForUpdate.contains(strcombinedEventsAirAttendee)){
-            //         objcontact.Id = mapOfContactStringAndId.get(strcombinedEventsAirAttendee);
+            //         objcontact.Id = mapOfContactStringAndIds.get(strcombinedEventsAirAttendee);
             //         ListOfContactToUpdate.add(objcontact);
             //         setOfCurrentContactCombinedDataToCheckForUpdate.add(strcombinedEventsAirAttendee);
             //     }else {
@@ -1025,9 +993,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             // }
         }
        
-        for(Contact objcontact :ListOfContactToInsert){
-            FinalListOfContactToInsert.add(objcontact);   
-        }
+        // for(Contact objcontact :ListOfContactToInsert){
+        //     FinalListOfContactToInsert.add(objcontact);   
+        // }
         
          if(FinalListOfContactToInsert.size()>0){
             Database.insert(FinalListOfContactToInsert,false);
@@ -1042,18 +1010,18 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             // }
         // }
         
-        List<Contact> LstConForMapping = [Select Id,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];
-        // for adding the new Leads in Map
-        for(Contact objcontact :LstConForMapping){
-            mapOfContactStringAndId.put(objcontact.CombinedString__c, objcontact.Id); 
-        }
-        return mapOfContactStringAndId;
+        // List<Contact> LstConForMapping = [Select Id,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];
+        // // for adding the new Leads in Map
+        // for(Contact objcontact :LstConForMapping){
+        //     mapOfContactStringAndIds.put(objcontact.CombinedString__c, objcontact.Id); 
+        // }
+        // return mapOfContactStringAndIds;
         
        
     }
 
     // to insert only new Leads if not exist in salesforce
-    public static Map<String, Id> insertLeadsIfNotExist(List<Lead> leadsToInsert, Set<String> setOfCombinedEventsAirAttendee) {
+    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Set<String> setOfCombinedEventsAirAttendee) {
     
         //fetch existing leads based on Combined name and email
         List<Lead> LstOfExtistingLead = [Select Id,FirstName, LastName,Email,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
@@ -1064,8 +1032,8 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
         }
 
-        List<Lead> ListOfLeadToInsert = new List<Lead>();
-            List<Lead> FinalListOfLeadToInsert = new List<Lead>();
+        // List<Lead> ListOfLeadToInsert = new List<Lead>();
+        List<Lead> FinalListOfLeadToInsert = new List<Lead>();
         Set<String> setOfCurrentleadCombinedData = new Set<String>();
         
         for(Lead objLead :leadsToInsert){
@@ -1075,31 +1043,17 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             if(!mapOfLeadStringAndId.ContainsKey(strcombinedEventsAirAttendee)){
                 // this is for check current batch duplicate data
                 if(!setOfCurrentleadCombinedData.contains(strcombinedEventsAirAttendee)){
-                        ListOfLeadToInsert.add(objLead);
+                        // ListOfLeadToInsert.add(objLead);
+                        FinalListOfLeadToInsert.add(objLead);
                     setOfCurrentleadCombinedData.add(strcombinedEventsAirAttendee);
                 }
-                else{
-                    system.debug('Lead alreaded added');
-                }
-            }else{
-                system.debug('Lead already exist in Salesforce');
             }
-        }
-
-        for(Lead objLead :ListOfLeadToInsert){
-            FinalListOfLeadToInsert.add(objLead);   
         }
         
         if(FinalListOfLeadToInsert.size()>0){
             insert FinalListOfLeadToInsert;
         }
-        
-        List<Lead> LstForMappingLead = [select id,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
-        // for adding the new Leads in Map
-        for(Lead objLead :LstForMappingLead){
-            mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
-        }
-        return mapOfLeadStringAndId; 
+         
     }
 
     public void insertProdAndServicesIfNotExist(List<Product_Service_Option__c> lstInsrtProdAndServices) {
@@ -1123,16 +1077,24 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         }
         
         List<Product_Service_Option__c> finallisttoinsertProdAndService = new List<Product_Service_Option__c>();
-        
+        List<Product_Service_Option__c> finallisttoUpdateProdAndService = new List<Product_Service_Option__c>();
+
         for(Product_Service_Option__c newProdAndService: lstInsrtProdAndServices) {
             if(!mapOfEvnPrdSericeIdandSfPrdServiceId.containskey(newProdAndService.EventsAirMarketing_Record_ID__c)) {
                 finallisttoinsertProdAndService.add(newProdAndService);
+            }else{
+                newProdAndService.Id = mapOfEvnPrdSericeIdandSfPrdServiceId.get(newProdAndService.EventsAirMarketing_Record_ID__c);
+                finallisttoUpdateProdAndService.add(newProdAndService);
             }
         }
         system.debug('finallisttoinsertProdAndService'+finallisttoinsertProdAndService.size());
         if(finallisttoinsertProdAndService.size() >0) {
             system.debug('finallisttoinsertProdAndService'+finallisttoinsertProdAndService.size());
             insert finallisttoinsertProdAndService ;
+        }
+        if(finallisttoUpdateProdAndService.size() >0) {
+            system.debug('finallisttoUpdateProdAndService'+finallisttoUpdateProdAndService.size());
+            update finallisttoUpdateProdAndService ;
         }
         
     }
@@ -1175,12 +1137,12 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             insert finallisttoinsertreg ;
         }
         if (listtoUpdatereg.size() > 0) {
-            update listtoUpdatereg;
+           // update listtoUpdatereg;
         }
         
     }
-     // method to insert new Opportunity(no duplicates) in salesforce
-     public void insertOpportunityIfNotExist(List<Opportunity> lstInsrtOpp) {
+    // method to insert new Opportunity(no duplicates) in salesforce
+    public void insertOpportunityIfNotExist(List<Opportunity> lstInsrtOpp) {
     
         Map<String, Id> mapOfEvnconIdandSfOppId = new Map<String, Id>();
         set<String> setOfEvnconIds = new set<String>();
@@ -1535,28 +1497,29 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                 }
             }
         }
+        List<OpportunityLineItem> listOliForLinkOppWithReg = new List<OpportunityLineItem>();
+
+        //Database.upsert(lstInsertOppProduct, OpportunityLineItem.Function_Registration_Id__c, false);
         
+        Map<String, Id> mapOfEvnOLIandSfId = new Map<String, Id>();
+        set<String> setOfEvnOLIIds = new set<String>();
+        
+        for(OpportunityLineItem oli: lstInsertOppProduct) {
+            setOfEvnOLIIds.add(oli.Function_Registration_Id__c);
+        }
+        
+        //do soql on con to fetch data based on eventsair contact id
+        List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c
+                                                        FROM OpportunityLineItem 
+                                                        WHERE Function_Registration_Id__c IN: setOfEvnOLIIds];
+        
+        if(lstexistingOlis.size() > 0) {
+            for(OpportunityLineItem existingoli: lstexistingOlis) {
+                mapOfEvnOLIandSfId.put(existingoli.Function_Registration_Id__c, existingoli.Id);
+            }
+        }
         if(!lstInsertOppProduct.isEmpty()) {
-            //Database.upsert(lstInsertOppProduct, OpportunityLineItem.Function_Registration_Id__c, false);
-            
-            Map<String, Id> mapOfEvnOLIandSfId = new Map<String, Id>();
-            set<String> setOfEvnOLIIds = new set<String>();
-            
-            for(OpportunityLineItem oli: lstInsertOppProduct) {
-                setOfEvnOLIIds.add(oli.Function_Registration_Id__c);
-            }
-            
-            //do soql on con to fetch data based on eventsair contact id
-            List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c
-                                                         FROM OpportunityLineItem 
-                                                         WHERE Function_Registration_Id__c IN: setOfEvnOLIIds];
-            
-            if(lstexistingOlis.size() > 0) {
-                for(OpportunityLineItem existingoli: lstexistingOlis) {
-                    mapOfEvnOLIandSfId.put(existingoli.Function_Registration_Id__c, existingoli.Id);
-                }
-            }
-            
+ 
             List<OpportunityLineItem> finallisttoinsertoli= new List<OpportunityLineItem>();
             
             for(OpportunityLineItem newoli: lstInsertOppProduct) {
@@ -1568,26 +1531,28 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             if(finallisttoinsertoli.size() >0) {
                 system.debug('Oli'+finallisttoinsertoli.size());
                 insert finallisttoinsertoli;
-                UpdateRegistrationsOLI(finallisttoinsertoli);
+                listOliForLinkOppWithReg.addAll(finallisttoinsertoli);
             }
         }
-        
+        listOliForLinkOppWithReg.addAll(lstexistingOlis);
+        UpdateRegistrationsOLI(listOliForLinkOppWithReg);
     }
-    public static void UpdateRegistrationsOLI(List<OpportunityLineItem> finallisttoinsertoli){
-        system.debug(finallisttoinsertoli);
+
+    public static void UpdateRegistrationsOLI(List<OpportunityLineItem> listOliForLinkOppWithReg){
+        system.debug(listOliForLinkOppWithReg);
         List<string> LstOfEventsairRegId = new List<string>(); 
-        Map<string,Id> MapOfEventsairRegIdandOLI = new Map<string,Id>();
-        for(OpportunityLineItem oli : finallisttoinsertoli){
+        Map<string,OpportunityLineItem> MapOfEventsairRegIdandOLI = new Map<string,OpportunityLineItem>();
+        for(OpportunityLineItem oli : listOliForLinkOppWithReg){
             LstOfEventsairRegId.add(oli.EventsAir_Regisration_ID__c);
-            MapOfEventsairRegIdandOLI.put(oli.EventsAir_Regisration_ID__c,oli.Id);
+            MapOfEventsairRegIdandOLI.put(oli.EventsAir_Regisration_ID__c,oli);
             
         }
         
         List<Registration__c> lstOfRegistrationtoLink = [select id,EventsAir_Regisration_ID__c,Opportunity_Product__c from Registration__c where EventsAir_Regisration_ID__c in:LstOfEventsairRegId ];
         
         for(Registration__c reg : lstOfRegistrationtoLink){
-            reg.Opportunity_Product__c = MapOfEventsairRegIdandOLI.get(reg.EventsAir_Regisration_ID__c);
-            
+            reg.Opportunity_Product__c = MapOfEventsairRegIdandOLI.get(reg.EventsAir_Regisration_ID__c).Id;
+            reg.Opportunity__c = MapOfEventsairRegIdandOLI.get(reg.EventsAir_Regisration_ID__c).OpportunityId;
         }   
         //update lstOfRegistrationtoLink;
         Database.update(lstOfRegistrationtoLink,false);
@@ -1605,11 +1570,11 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             if(lstcustsett2[0].Is_Execute_Next__c == true) {
                 
                 // update offset in custom setting
-                // lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
-                // update lstcustsett2;
+                lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
+                update lstcustsett2;
                 
-                // ImportRegistartionFromEventsAirBatch newBatch = new ImportRegistartionFromEventsAirBatch(strEventId, sfeventId);
-                // Database.executeBatch(newBatch, 500);
+                ImportRegistartionFromEventsAirBatch newBatch = new ImportRegistartionFromEventsAirBatch(strEventId, sfeventId);
+                Database.executeBatch(newBatch, 500);
             }
             else {
                 lstcustsett2[0].Is_Execute_Next__c = true;

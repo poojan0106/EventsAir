@@ -90,6 +90,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                 'tickets,'+  
                 'checkInDate,' +
                 'checkOutDate,' +
+                'createdAt,' +
                 'feeType {' +
                 'id,' +            
                 'name,' + 
@@ -175,6 +176,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             'tickets,'+  
             'checkInDate,' +
             'checkOutDate,' +
+            'createdAt,' +
             'feeType {' +
             'id,' +            
             'name,' + 
@@ -226,7 +228,6 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         request.setHeader('Authorization', 'Bearer ' + strtoken);
         
         HttpResponse response = http.send(request);
-        System.debug('@@@ response = '+response);
         System.debug('@@@@ response = '+response.getBody());
         
         List<ResponseWrapper> lstofresponseWrapper = new List<ResponseWrapper>();
@@ -261,14 +262,14 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         if(eventDatamap != null) {
             eventmap = (Map<String, Object>) eventDatamap.get('event');   
         }
-        System.debug('strEventId '+strEventId);
+
         //***  create pricebook if Is_Pricebook_Created__c is false on event *** 
         List<Event__c> lstevent = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, New_Event_Logo__c, Is_Pricebook_Created__c,Event_Category__c
                                    FROM Event__c
-                                   WHERE EventsAirID__c =: strEventId   Order By CreatedDate DESC LIMIT 1];
+                                   WHERE Id =: sfeventId  Order By CreatedDate DESC LIMIT 1];
         List<Event__c> updteventlst = new List<Event__c>(); 
+        List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId];
         List<Pricebook2> lstInsrtPricebook = new List<Pricebook2>();
-        System.debug('lsteventsairContacts ' +eventmap.get('startDate'));
         
         String evtStartDate = (String) eventmap.get('startDate');
         String evtCloseDate = (String) eventmap.get('endDate');
@@ -279,32 +280,33 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             if(lstevent[0].Event_Category__c != null){
                 eventCategory = lstevent[0].Event_Category__c; 
             }
-            if(lstevent[0].Is_Pricebook_Created__c == false) {
+            if(lstevent[0].Is_Pricebook_Created__c == false || (lstevent[0].Is_Pricebook_Created__c == true && lstPriceook.size() == 0)) {
                 //Pricebook2 field mapping
                 Pricebook2 newPricebook = new Pricebook2();
                 newPricebook.Name = (String) eventmap.get('name')+' Visitor'; 
-                newPricebook.Events__c = lstevent[0].Id;
+                newPricebook.Events__c = sfeventId;
                 newPricebook.Description = 'Description of the pricebook'; 
                 newPricebook.IsActive = true; // Set the pricebook as active
                 lstInsrtPricebook.add(newPricebook);
                 lstevent[0].Is_Pricebook_Created__c = true; //make is created pricebook checkbox to true on event
-            }                           
-            lstevent[0].Event_Logo__c = evtLogo;
+            }                        
+            if(evtLogo != null) {
+                lstevent[0].Event_Logo__c = evtLogo;
+            } 
+            if (evtStartDate != null) {
+                lstevent[0].Open_Date__c = (Datetime) JSON.deserialize('"' + evtStartDate + '"', Datetime.class);     
+            }
+            if (evtCloseDate != null) {
+                lstevent[0].Close_Date__c = (Datetime) JSON.deserialize('"' + evtCloseDate + '"', Datetime.class);     
+            }  
             updteventlst.add(lstevent[0]);
         }
         
-        if (!updteventlst.isEmpty()) {
-            if (evtStartDate != null) {
-                updteventlst[0].Open_Date__c = (Datetime) JSON.deserialize('"' + evtStartDate + '"', Datetime.class);     
-            }
-            if (evtCloseDate != null) {
-                updteventlst[0].Close_Date__c = (Datetime) JSON.deserialize('"' + evtCloseDate + '"', Datetime.class);     
-            }           
+        if (!updteventlst.isEmpty()) {        
             update updteventlst;              
         }  
         
         if(!lstInsrtPricebook.isEmpty()) {
-            system.debug('lstInsrtPricebook'+lstInsrtPricebook);  
             insert lstInsrtPricebook;
         }
         
@@ -312,14 +314,12 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         if(eventmap != null){
             lsteventsairContacts = (List<Object>) eventmap.get('contacts'); 
         }
-        
-        System.debug('lsteventsairContacts '+lsteventsairContacts);
+
         if(lsteventsairContacts.size()>0){
             createRecords(lsteventsairContacts); 
         }
-        
-        
-        if(lsteventsairContacts.isEmpty() && lsteventsairContacts.isEmpty()) {
+         
+        if(lsteventsairContacts.isEmpty()) {
             //update offset in custom setting
             System.debug('@@@ All Data Synced');
             lstcustsett[0].Is_Execute_Next__c = false; //This is used to stop batch to run in recursion
@@ -335,10 +335,9 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         lstInsrtProdAndServices = new List<Product_Service_Option__c>();
         Set<String> setOfDomainName = new Set<String>();
         Map<String, Id> mapOfDomainNameAndAccId = new Map<String, Id>();
-        Map<String, Id> mapOfOrganizationNameAndAccId = new Map<String, Id>();
         Map<String, Id> mapOfDomainNameAndAccOwnerId = new Map<String, Id>();
         Set<String> AccountNamesForCheckCreation = new Set<String>();
-        Set<String> accNeedToCreatePreName = new Set<String>();
+        Map<String, String> accNeedToCreatePreName = new Map<String, String>();
         
         //Loop through event's air contacts data to extract contact's email domain name
         for(Object objeventcon: lsteventsairContacts) {
@@ -347,16 +346,21 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             String strevntconemail = (String) eventconmap.get('primaryEmail');            
             String orgNameForAccCreation = (String) eventconmap.get('organizationName');
             String orgNameOfAccountInSF;
-            String domainNameOfNullOrganizationNameInResponse;
-
-            System.debug('@@@ strevntconemail = '+strevntconemail);
+            String domainname;
             if(strevntconemail != null && strevntconemail != '') {
                 String[] emailparts = strevntconemail.split('@');
                 if (emailparts.size() > 1) {
+                    domainname = emailparts[1].trim().toLowerCase();
                     setOfDomainName.add(emailparts[1].trim().toLowerCase());
-                    domainNameOfNullOrganizationNameInResponse = emailparts[1].trim().toLowerCase();
+                    
+                    if (orgNameForAccCreation == null || orgNameForAccCreation == '') {
+                        AccountNamesForCheckCreation.add(emailparts[1].trim().toLowerCase());
+                        accNeedToCreatePreName.put(domainname, domainname);
+
+                    }
                 }
-            }else {
+            }
+            /*else {
                 if(orgNameForAccCreation != null && orgNameForAccCreation != ''){
                     if (orgNameForAccCreation.length() > 80) {
                         orgNameOfAccountInSF = (orgNameForAccCreation.length() > 80) ? orgNameForAccCreation.substring(0, 80) : orgNameForAccCreation;    
@@ -365,7 +369,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                     }
                     accNeedToCreatePreName.add(orgNameOfAccountInSF.toLowerCase());
                 }
-            }
+            }*/
 
             if(orgNameForAccCreation != null && orgNameForAccCreation != ''){
                 if (orgNameForAccCreation.length() > 80) {
@@ -373,25 +377,27 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                 } else{
                     orgNameOfAccountInSF = orgNameForAccCreation;
                 }
+                accNeedToCreatePreName.put(orgNameOfAccountInSF.toLowerCase(), domainname);
                 AccountNamesForCheckCreation.add(orgNameOfAccountInSF.toLowerCase());
-            }else {
-                if (domainNameOfNullOrganizationNameInResponse != '' && domainNameOfNullOrganizationNameInResponse != null) {
-                        AccountNamesForCheckCreation.add(domainNameOfNullOrganizationNameInResponse.toLowerCase());
-                }else {
-                    System.debug('Organization Name and domain both are null which is not preferable');
-                }
             }
         }
+
         System.debug('accNeedToCreatePreName :-'+ accNeedToCreatePreName);
         System.debug('@@@ setOfDomainName = '+setOfDomainName);
         System.debug('@@@ setOfDomainName size = '+setOfDomainName.size());
         
         if (accNeedToCreatePreName.size() > 0) {
-            List<Account> newCreateAccListOfOrgNames = [SELECT Id,Name,Domain_Name__c From Account Where Name IN :accNeedToCreatePreName  AND Account_Status__c != 'Inactive' and On_Hold__c = false];
-            List<String> existingOrgNameInSfAccRecords = new List<String>();
+            List<Account> newCreateAccListOfOrgNames = [SELECT Id,Name,Domain_Name__c From Account Where Name IN :accNeedToCreatePreName.keySet()  AND Account_Status__c != 'Inactive' and On_Hold__c = false];
+
+            List<Account> existingAccountsWithDomainName = [SELECT Id, Name,Domain_Name__c FROM Account WHERE Domain_Name__c IN :setOfDomainName AND Account_Status__c != 'Inactive' and On_Hold__c = false];
 
             if(newCreateAccListOfOrgNames.size() > 0){
                 for(Account acc : newCreateAccListOfOrgNames){
+                    accNeedToCreatePreName.remove(acc.Name.toLowerCase());
+                }
+            }
+            if(existingAccountsWithDomainName.size() > 0){
+                for(Account acc : existingAccountsWithDomainName){
                     accNeedToCreatePreName.remove(acc.Name.toLowerCase());
                 }
             }
@@ -400,7 +406,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             // Loop over each contact
             for(Object objeventcon: lsteventsairContacts) {
                 Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;
-                List<Object> lsteventsairReg = (List<Object>) eventconmap.get('registrations');
+                List<Object> lsteventsairReg = (List<Object>) eventconmap.get('functionRegistrations');
                 Boolean hasCharge = false; // Flag to track if any registration has totalChargeAmount > 0
                 String orgNameForAccCreation = (String) eventconmap.get('organizationName');
                 String orgNameOfAccountInSF;
@@ -432,7 +438,9 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                     }  
                 }
                 if(!hasCharge){
-                    accNeedToCreatePreName.remove(orgNameOfAccountInSF.toLowerCase());
+                    if (orgNameOfAccountInSF != null && orgNameOfAccountInSF != '') {
+                        accNeedToCreatePreName.remove(orgNameOfAccountInSF.toLowerCase());
+                    }
                 } 
             }
         }
@@ -440,7 +448,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         if (accNeedToCreatePreName.size() > 0) {
             List<Account> listAccPreCreate = new List<Account>();
 
-            for(String accName: accNeedToCreatePreName) {
+            for(String accName: accNeedToCreatePreName.keySet()) {
 
                 Account newAccount = new Account();
                 if (RecordType == 'Mumbrella') {
@@ -454,6 +462,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                     newAccount.Name = 'UNKNOWN';
                 }
                 newAccount.AccountSource = 'EventsAir';
+                newAccount.Domain_Name__c = accNeedToCreatePreName.get(accName);
                 listAccPreCreate.add(newAccount);
             }
             if (listAccPreCreate.size() > 0) {
@@ -463,14 +472,15 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         }
 
         //create map for if domain not match check for account name with organization name of event's Air data
-        Map<String, String> MapOfexistingAccountsOrgNameAndAccount = new Map<String, String>();
+        Map<String, String> MapOfexistingAccountsOrgNameAndAccountId = new Map<String, String>();
         if (AccountNamesForCheckCreation != null) {
             List<Account> exitingAccListOfOrgNames = [SELECT Id,Name,Domain_Name__c From Account Where Name IN :AccountNamesForCheckCreation  AND Account_Status__c != 'Inactive' and On_Hold__c = false];
         
             for (Account acct : exitingAccListOfOrgNames) {
-                MapOfexistingAccountsOrgNameAndAccount.put(acct.Name.toLowerCase(),acct.Id);
+                MapOfexistingAccountsOrgNameAndAccountId.put(acct.Name.toLowerCase(),acct.Id);
             }
         }
+
         //if set contains any value then do soql on account and fill the mapOfDomainNameAndAccId Map
         if(setOfDomainName != null) {
             for (AggregateResult aggregateResult : [
@@ -493,15 +503,6 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             }
         }
         System.debug('@@@ mapOfDomainNameAndAccId ='+mapOfDomainNameAndAccId);
-        
-        Map<String, Account> existingAccountsMapForDomainName = new Map<String, Account>();
-        List<Account> accountToInsertList = new List<Account>();
-
-        // Retrieve existing Accounts
-        List<Account> existingAccounts = [SELECT Id, Name,Domain_Name__c FROM Account WHERE Domain_Name__c IN :setOfDomainName AND Account_Status__c != 'Inactive' and On_Hold__c = false];
-        for (Account acc : existingAccounts) {
-            existingAccountsMapForDomainName.put(acc.Domain_Name__c.toLowerCase(), acc);
-        }
 
         // fill the list of firstname + lastName + email for fetch lead and contact based on combined string
         Set<String> setOfCombinedEventsAirAttendee = new Set<String>(); 
@@ -628,30 +629,10 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                     //create contact if found the exiting account based on domain name and create account and contact if not found                        
                     if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
                         objcon.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-                    } else if(MapOfexistingAccountsOrgNameAndAccount.containsKey(orgNameForMap)){
-                        System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccount.get(orgNameForMap));
-                        objcon.AccountId = MapOfexistingAccountsOrgNameAndAccount.get(orgNameForMap);
-                    }else{
-                        if (!existingAccountsMapForDomainName.containsKey(strAccdomainname)  && strAccdomainname != '' && strAccdomainname != null) {
-                           String orgName = (String) eventconmap.get('organizationName');
-                           Account newAccount = new Account();
-                            if (RecordType == 'Mumbrella') {
-                                newAccount.RecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId();
-                            } else {
-                                newAccount.RecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Diversified').getRecordTypeId();     
-                            }
-                            if(orgName != null && orgName != ''){
-                                newAccount.Name = (orgName.length() > 80) ? orgName.substring(0, 80) : orgName;
-                            }else{
-                                newAccount.Name = strAccdomainname;
-                            }
-                            newAccount.AccountSource = 'EventsAir';
-                            newAccount.Domain_Name__c = strAccdomainname;
-                            accountToInsertList.add(newAccount);
-                            existingAccountsMapForDomainName.put(newAccount.Domain_Name__c, newAccount); 
-                        }
-                    }
-                    
+                    } else if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgNameForMap)){
+                        System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccountId.get(orgNameForMap));
+                        objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgNameForMap);
+                    }  
                     lstInsrtCon.add(objcon);
                 }else{
                     // create lead if combined String is unpaid registration and it is not found in contact as well as lead
@@ -730,59 +711,32 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         System.debug('@@@ lstInsrtCon = '+lstInsrtCon);
         System.debug('@@@2 lstInsrtCon Size = '+lstInsrtCon.size());
 
-         // Insert Accounts
-        Map<String, Id> MapOfDomainNameAndId = new Map<String, Id>();
-        if (!accountToInsertList.isEmpty()) {            
-            insert accountToInsertList;
-            for (Account acc : accountToInsertList) {
-                MapOfDomainNameAndId.put(acc.Domain_Name__c.toLowerCase(), acc.Id);
-                
-            }
-        }
-        // link new account and contact based on domain name of contact email
-        for (Contact con : lstInsrtCon) {
-            String ContactEmailDomainName;
-            if(con.Email != null && con.Email != '') {
-                String[] emailparts = con.Email.split('@');
-                if (emailparts.size() > 1) {
-                    ContactEmailDomainName = emailparts[1].trim().toLowerCase();
-                }
-            }
-            if (ContactEmailDomainName != null && ContactEmailDomainName != '') {
-                if (MapOfDomainNameAndId.containskey(ContactEmailDomainName)) {
-                    con.accountId = MapOfDomainNameAndId.get(ContactEmailDomainName);
-                } 
-            }
-            if (con.Organization_Name__c != null && con.Organization_Name__c != '' ) {
-                mapOfOrganizationNameAndAccId.put(con.Organization_Name__c.trim().toLowerCase() ,con.AccountId);     
-            }        
-        }
-        
-
         // Insert Contacts
         if (!lstInsrtCon.isEmpty()) {            
             //List<Contact> lstContacts = removeContactsDuplicates(lstInsrtCon);
-            mapOfContactStringAndId = insertContactsIfNotExist(lstInsrtCon, setOfCombinedEventsAirAttendee);   
-        }else {
-            List<Contact> LstOfExtistingContact = [Select Id,FirstName, LastName,Email,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];            
-            //loop through existing Contacts and fill the map
-            for(Contact objContact :LstOfExtistingContact){
-                mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id); 
-            }
+            insertContactsIfNotExist(lstInsrtCon, setOfCombinedEventsAirAttendee);   
         }
+
+        List<Contact> LstOfExtistingContact = [Select Id,FirstName, LastName,Email,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];            
+        //loop through existing Contacts and fill the map
+        for(Contact objContact :LstOfExtistingContact){
+            mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id); 
+        }
+        
 
         // Insert Lead
         if (!lstInsrtLead.isEmpty()) {
-            mapOfLeadStringAndId = insertLeadsIfNotExist(lstInsrtLead, setOfCombinedEventsAirAttendee); 
+            insertLeadsIfNotExist(lstInsrtLead, setOfCombinedEventsAirAttendee); 
             system.debug('insertLeadsIfNotExist');
-        }else {
-            List<Lead> LstOfExtistingLead = [Select Id,FirstName, LastName,Email,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
-        
-            //loop through existing leads and fill the map
-            for(Lead objLead :LstOfExtistingLead){
-                mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
-            }
         }
+
+        List<Lead> LstOfExtistingLead = [Select Id,FirstName, LastName,Email,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
+    
+        //loop through existing leads and fill the map
+        for(Lead objLead :LstOfExtistingLead){
+            mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
+        }
+        
         // Loop through event's air contacts data to create Product & Services
         for(Object objeventcon : lsteventsairContacts) {
             Map<String, Object> eventconmap = (Map<String, Object>) objeventcon;
@@ -879,6 +833,9 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                 //Registartion field mapping start
                 Registration__c objreg = new Registration__c();                
                 objreg.RecordTypeId = Schema.SObjectType.Registration__c.getRecordTypeInfosByDeveloperName().get('Function_Registration').getRecordTypeId(); 
+                if(strRegDate != null) {
+                    objreg.Date_Registered__c = (Datetime) JSON.deserialize('"' + strRegDate + '"', Datetime.class);
+                }
                 objreg.EventsAir_Regisration_ID__c = (String) eventReg.get('id');
                 objreg.EventsAir_Contact_Id__c = (String) eventconmap.get('id');
                 objreg.Event__c = sfeventId; 
@@ -892,6 +849,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                 } */
                 objreg.EventsAir_Function_Id__c = (String) tempfunmap.get('id');
                 String checkInDate = (String) eventReg.get('checkInDate');
+                String createdAtDate = (String) eventReg.get('createdAt');
                 String checkOutDate = (String) eventReg.get('checkOutDate');             
 
                 string Finalstring = getCombinedString(objeventcon);
@@ -945,8 +903,8 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                         objOpp.Name = strOppName;
                         if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)){
                             objOpp.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-                        }else if(mapOfOrganizationNameAndAccId.containsKey(OrganizationName)){
-                            objOpp.AccountId = mapOfOrganizationNameAndAccId.get(OrganizationName);
+                        }else if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(OrganizationName)){
+                            objOpp.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(OrganizationName);
                         }
                         
                         if(mapOfDomainNameAndAccOwnerId.containsKey(strAccdomainname)){
@@ -955,7 +913,12 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                         
                         objOpp.Is_Private__c = false;	
                         objOpp.LeadSource = 'EventsAir';
-                        objOpp.Closedate = System.today();
+                        if(checkInDate != null) {
+                            objOpp.Closedate = Date.valueOf(checkInDate);                  
+                        }else{
+                            objOpp.Closedate =  Date.valueOf(createdAtDate);
+                        }
+
                         if (RecordType == 'Mumbrella') {
                             objOpp.RecordTypeId = Schema.SObjectType.Opportunity.getRecordTypeInfosByDeveloperName().get('Mumbrella_Visitor').getRecordTypeId();                          
                         } else {
@@ -1023,18 +986,18 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     } 
 
     // method to insert new contacts(no duplicates) in salesforce
-    public static Map<String, Id> insertContactsIfNotExist(List<Contact> contactsToInsert , Set<String> setOfCombinedEventsAirAttendee) {
+    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Set<String> setOfCombinedEventsAirAttendee) {
         
         //fetch existing Contacts based on Combined name and email
         List<Contact> LstOfExtistingContact = [Select Id,FirstName, LastName,Email,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];
-        Map<String, Id> mapOfContactStringAndId = new Map<String, Id>();
+        Map<String, Id> mapOfContactStringAndIds = new Map<String, Id>();
         
         //loop through existing Contacts and fill the map
         for(Contact objContact :LstOfExtistingContact){
-            mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id); 
+            mapOfContactStringAndIds.put(objContact.CombinedString__c, objContact.Id); 
         }
 
-        List<Contact> ListOfContactToInsert = new List<Contact>();
+        // List<Contact> ListOfContactToInsert = new List<Contact>();
         List<Contact> FinalListOfContactToInsert = new List<Contact>();
         // List<Contact> ListOfContactToUpdate = new List<Contact>();
         // Set<String> setOfCurrentContactCombinedDataToCheckForUpdate = new Set<String>();
@@ -1045,21 +1008,18 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
             
             //check if lead exist or not
-            if(!mapOfContactStringAndId.ContainsKey(strcombinedEventsAirAttendee)){
+            if(!mapOfContactStringAndIds.ContainsKey(strcombinedEventsAirAttendee)){
                 // this is for check current batch duplicate data
                 if(!setOfCurrentContactCombinedData.contains(strcombinedEventsAirAttendee)){
-                    ListOfContactToInsert.add(objcontact);
+                    // ListOfContactToInsert.add(objcontact);
+                    FinalListOfContactToInsert.add(objcontact);
                     setOfCurrentContactCombinedData.add(strcombinedEventsAirAttendee);
-                }
-                else{
-                    system.debug('contact alreaded added');
-                }
-                
+                } 
             }
             // else{
             //     system.debug('contact already exist in Salesforce');
             //     if(!setOfCurrentContactCombinedDataToCheckForUpdate.contains(strcombinedEventsAirAttendee)){
-            //         objcontact.Id = mapOfContactStringAndId.get(strcombinedEventsAirAttendee);
+            //         objcontact.Id = mapOfContactStringAndIds.get(strcombinedEventsAirAttendee);
             //         ListOfContactToUpdate.add(objcontact);
             //         setOfCurrentContactCombinedDataToCheckForUpdate.add(strcombinedEventsAirAttendee);
             //     }else {
@@ -1068,9 +1028,9 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             // }
         }
         
-        for(Contact objcontact :ListOfContactToInsert){
-            FinalListOfContactToInsert.add(objcontact);     
-        }
+        // for(Contact objcontact :ListOfContactToInsert){
+        //     FinalListOfContactToInsert.add(objcontact);     
+        // }
         
         if(FinalListOfContactToInsert.size()>0){
             Database.insert(FinalListOfContactToInsert,false);
@@ -1083,23 +1043,11 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         //             system.debug('Failed to update Contact Id: ' + sr.getId() + ', Error: ' + sr.getErrors()[0].getMessage());
         //         }
         //     }
-        // }
-
-        List<Contact> LstConForMapping = [Select Id,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];
-        system.debug('LstConForMapping- size'+LstConForMapping.size());
-        // for adding the new Leads in Map
-        for(Contact objcontact :LstConForMapping){
-            mapOfContactStringAndId.put(objcontact.CombinedString__c, objcontact.Id); 
-        }
-        system.debug('@@mapOfContactStringAndId'+mapOfContactStringAndId);
-        system.debug('@@mapOfContactStringAndId - size'+mapOfContactStringAndId.size());
-        return mapOfContactStringAndId;
-        
-        
+        // }    
     }
 
     // to insert only new Leads if not exist in salesforce
-    public static Map<String, Id> insertLeadsIfNotExist(List<Lead> leadsToInsert, Set<String> setOfCombinedEventsAirAttendee) {
+    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Set<String> setOfCombinedEventsAirAttendee) {
     
         //fetch existing leads based on Combined name and email
         List<Lead> LstOfExtistingLead = [Select Id,FirstName, LastName,Email,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
@@ -1110,8 +1058,8 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
         }
 
-        List<Lead> ListOfLeadToInsert = new List<Lead>();
-            List<Lead> FinalListOfLeadToInsert = new List<Lead>();
+        // List<Lead> ListOfLeadToInsert = new List<Lead>();
+        List<Lead> FinalListOfLeadToInsert = new List<Lead>();
         Set<String> setOfCurrentleadCombinedData = new Set<String>();
         
         for(Lead objLead :leadsToInsert){
@@ -1121,31 +1069,17 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             if(!mapOfLeadStringAndId.ContainsKey(strcombinedEventsAirAttendee)){
                 // this is for check current batch duplicate data
                 if(!setOfCurrentleadCombinedData.contains(strcombinedEventsAirAttendee)){
-                        ListOfLeadToInsert.add(objLead);
+                        // ListOfLeadToInsert.add(objLead);
+                        FinalListOfLeadToInsert.add(objLead);
                     setOfCurrentleadCombinedData.add(strcombinedEventsAirAttendee);
                 }
-                else{
-                    system.debug('Lead alreaded added');
-                }
-            }else{
-                system.debug('Lead already exist in Salesforce');
             }
-        }
-
-        for(Lead objLead :ListOfLeadToInsert){
-            FinalListOfLeadToInsert.add(objLead);   
         }
         
         if(FinalListOfLeadToInsert.size()>0){
             insert FinalListOfLeadToInsert;
         }
-        
-        List<Lead> LstForMappingLead = [select id,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
-        // for adding the new Leads in Map
-        for(Lead objLead :LstForMappingLead){
-            mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
-        }
-        return mapOfLeadStringAndId; 
+
     }
     
     public void insertProdAndServicesIfNotExist(List<Product_Service_Option__c> lstInsrtProdAndServices) {
@@ -1232,7 +1166,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             listRegForConnectWithFunction.addAll(finallisttoinsertreg);
         }
         if (listtoUpdatereg.size() > 0) {
-            update listtoUpdatereg;
+            // update listtoUpdatereg;
         }
         return listRegForConnectWithFunction;
     }
@@ -1530,15 +1464,16 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                     Map<String, Object> eventregtypemap;
                     Map<String, Object> eventregPaydetailcodedetail;
                     string funregid = (String) eventReg.get('id');
-                      Object eventfunregtype = eventReg.get('feeType');                    
-                eventregtypemap = (Map<String, Object>)eventfunregtype;
-                String strRegTypeId = (String) eventregtypemap.get('id');
+                    Object eventfunregtype = eventReg.get('feeType');                    
+                    eventregtypemap = (Map<String, Object>)eventfunregtype;
+                    String strRegTypeId = (String) eventregtypemap.get('id');
                     System.debug('@@@ strRegTypeId = '+strRegTypeId);
                     Object eventregPaydetail = eventReg.get('paymentDetails');                    
                     eventregPaymentdetails = new Map<String, Object>();
                     eventregPaymentdetails = (Map<String, Object>)eventregPaydetail;
                     totalcharge = (Decimal)eventregPaymentdetails.get('totalChargeAmount');
                     strtickets = (String) eventReg.get('tickets');
+
                     if(eventregPaymentdetails.get('discountCode') != null){
                         Object eventregPaydetailcode = eventregPaymentdetails.get('discountCode');
                         eventregPaydetailcodedetail = (Map<String, Object>)eventregPaydetailcode;
@@ -1548,54 +1483,13 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                             discountcodeval = (String)eventregPaydetailcodedetail.get('code');
                         } 
                     }
-                    
-                    
-                    
-                    
-                    
                     // system.debug('totalcharge'+totalcharge);
                     
                     if(totalcharge > 0){
                         //OpportunityLineItem field mapping start
                         system.debug('totalcharge'+totalcharge);
                         if( mapOfEventConAndSFOppId.containsKey(strevntconId)  && mapOfEventRegTypeIdAndSFPBentryId.containskey(strRegTypeId)) {
-                            String streventconEmail = (String) eventconmap.get('primaryEmail');
-                            String streventconfname = (String) eventconmap.get('firstName');
-                            String streventconlname = (String) eventconmap.get('lastName');
-                            
-                            if(streventconlname == null || streventconlname == '') {
-                                streventconlname = '';
-                            }
-                            
-                            string fname;
-                            string lname; 
-                            string email ;
-                            
-                            if(streventconfname != null){
-                                if(streventconfname.length() <= 40) {
-                                    fname = streventconfname.trim();
-                                } else {
-                                    fname = streventconfname.substring(0,40).trim();
-                                }
-                            }
-                            else{
-                            fname = ''; 
-                            }
-                            
-                            if(streventconlname != null){
-                                lname = streventconlname.trim(); 
-                            }else{
-                            lname = 'UnKnown'; 
-                            }
-                            
-                            if(streventconEmail != null){
-                                email = streventconEmail.trim(); 
-                            }else{
-                            email = ''; 
-                            }
-                        
-                            string Finalstring = fname + lname + email;
-                            Finalstring = Finalstring.toLowerCase();
+                            String Finalstring = getCombinedString(objeventcon);
 
                             OpportunityLineItem oli = new OpportunityLineItem();
                             system.debug('mapOfEventConAndSFOppId.get(strevntconId)'+mapOfEventConAndSFOppId.get(strevntconId)+' '+strevntconId);
@@ -1632,28 +1526,29 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                 }
             }
         }
+
+        List<OpportunityLineItem> listOliForLinkOppWithReg = new List<OpportunityLineItem>();
         
+        //Database.upsert(lstInsertOppProduct, OpportunityLineItem.Function_Registration_Id__c, false);
+        
+        Map<String, Id> mapOfEvnOLIandSfId = new Map<String, Id>();
+        set<String> setOfEvnOLIIds = new set<String>();
+        
+        for(OpportunityLineItem oli: lstInsertOppProduct) {
+            setOfEvnOLIIds.add(oli.Function_Registration_Id__c);
+        }
+        //do soql on con to fetch data based on eventsair contact id
+        List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c
+                                                        FROM OpportunityLineItem 
+                                                        WHERE Function_Registration_Id__c IN: setOfEvnOLIIds];
+        
+        if(lstexistingOlis.size() > 0) {
+            for(OpportunityLineItem existingoli: lstexistingOlis) {
+                mapOfEvnOLIandSfId.put(existingoli.Function_Registration_Id__c, existingoli.Id);
+            }
+        }
+
         if(!lstInsertOppProduct.isEmpty()) {
-            //Database.upsert(lstInsertOppProduct, OpportunityLineItem.Function_Registration_Id__c, false);
-            
-            Map<String, Id> mapOfEvnOLIandSfId = new Map<String, Id>();
-            set<String> setOfEvnOLIIds = new set<String>();
-            
-            for(OpportunityLineItem oli: lstInsertOppProduct) {
-                setOfEvnOLIIds.add(oli.Function_Registration_Id__c);
-            }
-            
-            //do soql on con to fetch data based on eventsair contact id
-            List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c
-                                                         FROM OpportunityLineItem 
-                                                         WHERE Function_Registration_Id__c IN: setOfEvnOLIIds];
-            
-            if(lstexistingOlis.size() > 0) {
-                for(OpportunityLineItem existingoli: lstexistingOlis) {
-                    mapOfEvnOLIandSfId.put(existingoli.Function_Registration_Id__c, existingoli.Id);
-                }
-            }
-            
             List<OpportunityLineItem> finallisttoinsertoli= new List<OpportunityLineItem>();
             
             for(OpportunityLineItem newoli: lstInsertOppProduct) {
@@ -1665,26 +1560,28 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             if(finallisttoinsertoli.size() >0) {
                 system.debug('Oli'+finallisttoinsertoli.size());
                 insert finallisttoinsertoli;
-                UpdateRegistrationsOLI(finallisttoinsertoli);
+                listOliForLinkOppWithReg.addAll(finallisttoinsertoli);
             }
         }
+        listOliForLinkOppWithReg.addAll(lstexistingOlis);
+        UpdateRegistrationsOLI(listOliForLinkOppWithReg);
         
     }
-    public static void UpdateRegistrationsOLI(List<OpportunityLineItem> finallisttoinsertoli){
-        system.debug(finallisttoinsertoli);
+    public static void UpdateRegistrationsOLI(List<OpportunityLineItem> listOliForLinkOppWithReg){
+        system.debug(listOliForLinkOppWithReg);
         List<string> LstOfEventsairRegId = new List<string>(); 
-        Map<string,Id> MapOfEventsairRegIdandOLI = new Map<string,Id>();
-        for(OpportunityLineItem oli : finallisttoinsertoli){
+        Map<string,OpportunityLineItem> MapOfEventsairRegIdandOLI = new Map<string,OpportunityLineItem>();
+        for(OpportunityLineItem oli : listOliForLinkOppWithReg){
             LstOfEventsairRegId.add(oli.EventsAir_Regisration_ID__c);
-            MapOfEventsairRegIdandOLI.put(oli.EventsAir_Regisration_ID__c,oli.Id);
+            MapOfEventsairRegIdandOLI.put(oli.EventsAir_Regisration_ID__c,oli);
             
         }
         
         List<Registration__c> lstOfRegistrationtoLink = [select id,EventsAir_Regisration_ID__c,Opportunity_Product__c from Registration__c where EventsAir_Regisration_ID__c in:LstOfEventsairRegId ];
         
         for(Registration__c reg : lstOfRegistrationtoLink){
-            reg.Opportunity_Product__c = MapOfEventsairRegIdandOLI.get(reg.EventsAir_Regisration_ID__c);
-            
+            reg.Opportunity_Product__c = MapOfEventsairRegIdandOLI.get(reg.EventsAir_Regisration_ID__c).Id;
+            reg.Opportunity__c = MapOfEventsairRegIdandOLI.get(reg.EventsAir_Regisration_ID__c).OpportunityId;
         }
         //update lstOfRegistrationtoLink;
         Database.update(lstOfRegistrationtoLink,false);
@@ -1707,47 +1604,6 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     return filteredContacts;
     }*/
 
-
-    
-    public static Boolean isValidEmail(String email) {
-        
-        // Regular expression pattern for email validation
-        
-        String emailRegex = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$';
-        
-        
-        
-        // Compile the pattern
-        
-        Pattern pattern = Pattern.compile(emailRegex);
-        
-        boolean returnval;
-        
-        // Match the email against the pattern
-        
-        if(email != null && email !=''){
-            
-            Matcher matcher = pattern.matcher(email);
-            
-            returnval =  matcher.matches();
-            
-        }else if(email == null){
-            
-            returnval = true;
-            
-        }
-        
-        return returnval;
-        
-        // Return true if email matches the pattern, false otherwise
-        
-        
-        
-    }
-
-
-
-    
     public void LinkFunctionToRegistration(List<Registration__c> lstRegistration) {
         
         Set<String> setOfEventFunId = new Set<String>();
@@ -1812,8 +1668,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         return Finalstring;
         
     }
-    
-    
+  
     public void setupForFunctionReg(List<Object> lstobject) {
         
         List<Map<String, Object>> listOfFunctioninfomap = new List<Map<String, Object>>();
@@ -1827,8 +1682,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         createFunction(listOfFunctioninfomap);
         
     }
-    
-    
+
     public void createFunction(List<Map<String, Object>> listOfFunctioninfomap) {
         
         lstInsrtFun = new List<Function__c>();

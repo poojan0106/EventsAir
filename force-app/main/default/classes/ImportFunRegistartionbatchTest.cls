@@ -80,7 +80,6 @@ public class ImportFunRegistartionbatchTest {
         Test.startTest();
         
          PageReference resultPage = controllerInstance.executeBatch();
-        ImportFuncRegistartionFromEventsAirBatch.isValidEmail('Vandana@resonantcloud.info');
         ImportFuncRegistartionFromEventsAirBatch.generatestringMethod('Test1','Test2','Test3');
         Test.stopTest();
     }
