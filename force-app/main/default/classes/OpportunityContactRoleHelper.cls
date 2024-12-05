@@ -13,6 +13,7 @@ public class OpportunityContactRoleHelper{
     }
     
     public static void updateAccountPrimaryContact(Id oppId){
+
         try{
             Opportunity ocrOppAccount = [SELECT Id, Primary_Contact_Added__c, AccountId, Account.Primary_Contact__c,
                                             (SELECT Id, isPrimary, ContactId FROM OpportunityContactRoles WHERE isPrimary = true)

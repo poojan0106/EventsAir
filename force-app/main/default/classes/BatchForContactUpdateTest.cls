@@ -18,7 +18,8 @@ public class BatchForContactUpdateTest {
                 FirstName = 'Test',
                 LastName = 'Contact last ' ,
                 RecordTypeId = exhibitorRecordType.Id , // or visitorRecordType.Id based on your needs
-                AccountId = objAcc.Id
+                AccountId = objAcc.Id,
+                Readt_to_process__c = true
                 //OwnerId = '0056F000007lCj0QAE' // Ensure valid OwnerId
             );
             contactList.add(con);
@@ -72,7 +73,7 @@ public class BatchForContactUpdateTest {
         ApexPages.StandardController controller = new ApexPages.StandardController(contactList[0]);
         BatchForContactUpdate batch = new BatchForContactUpdate();
         batch.dumyy();
-        Database.executeBatch(batch, 1); // Specify the batch size
+        Database.executeBatch(batch); // Specify the batch size
         
         Test.stopTest();
 
