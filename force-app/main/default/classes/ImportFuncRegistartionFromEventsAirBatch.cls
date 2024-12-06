@@ -22,7 +22,6 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     Set<String> setofProductId = new Set<String>();
     Map<String, Id> mapOfEvnproandSfId = new Map<String, Id>();
     Map<String, Id> mapOfEventRegTypeIdAndSFPBentryId = new Map<String, Id>();
-    Map<String, Decimal> mapOfEventRegTypeIdAndSFPBentryPrice = new Map<String, Decimal>();
     String RecordType;
 
     //fetch current offset value from custom setting
@@ -51,98 +50,8 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         }
 
         // Prepare the GraphQL query based on the record type 
-        if(RecordType != 'Mumbrella') {
-            // Query for non-Mumbrella record types
-            graphqlQuery = '{' +
-                '"query": "query GetEventData($eventId: ID!, $contactsLimit: PaginationLimit!, $conoffset: NonNegativeInt!, $regLimit: PaginationLimit!,$input: CustomFieldSearchFilterInput!,) {' +
-                'event(id: $eventId) {' +
-                'id,' +
-                'name,' +
-                'startDate,' +
-                'endDate,' + 
-                'logo{' +
-                'url,' +
-                '},' +
-                'contacts(offset: $conoffset, limit: $contactsLimit) { ' +
-                'customFields(input: $input , limit:3){name, definitionId, value},' +
-                'marketingRecords(limit: 15){' +
-                'id,' +
-                'name,' +
-                'tag {' +
-                'id,' +
-                'name,' +
-                '},' +
-                'value' +
-                '},' +
-                'id,' +
-                'lastName,' +
-                'firstName,' +
-                'title,' +
-                'organizationName,' +
-                'checkInDate,' +
-                'checkOutDate,' +
-                'primaryEmail,' +
-                'primaryAddress {' +
-                'city,' + 
-                'country,' + 
-                'line1,' + 
-                'line2,' + 
-                'line3,' + 
-                'postCode,' + 
-                'state,' + 
-                '},' +
-                'contactPhoneNumbers {' +
-                'mobile,' +      
-                '},' +          
-                'functionRegistrations(limit: $regLimit) {' +
-                'id,' +
-                'tickets,' +  
-                'checkInDate,' +
-                'checkOutDate,' +
-                'createdAt,' +
-                'feeType {' +
-                'id,' +            
-                'name,' + 
-                'uniqueCode,' + 
-                'fees {' +
-                'amount,' +      
-                '},' +
-                '},' +
-                'function{' +
-                'id,' +
-                'name,' +
-                'start,' +
-                'date,' +
-                'end,' +
-                'overview,' +
-                'details,' +
-                '},' +
-                'paymentDetails {' +
-                'paymentStatus,' +
-                'discountAmount,' +
-                'adjustmentAmount,' +
-                'taxAmount,' +
-                'totalChargeAmount,' +     
-                'discountCode {' +
-                'code,' +
-                '},' +
-                '},' +
-                '}' +            
-                '}' +
-                '}' +
-                '}",' +
-                '"variables": {' +
-                '"eventId": "' + strEventId + '",' +
-                '"contactsLimit": ' + contactsLimit + ',' +
-                '"conoffset": ' + lstcustsett[0].Offset__c + ',' +
-                '"regLimit": ' + regLimit +  ','+
-                '"input": { "names": ["Industry" , "Company Size" , "Job Function"] }'  +            
-                '}' +
-                '}';
-        } else {
-            // Query for Mumbrella record type
-            graphqlQuery = '{' +
-            '"query": "query GetEventData($eventId: ID!, $contactsLimit: PaginationLimit!, $conoffset: NonNegativeInt!, $regLimit: PaginationLimit!,) {' +
+        String commonQueryTemplate = '{' +
+            '"query": "query GetEventData($eventId: ID!, $contactsLimit: PaginationLimit!, $conoffset: NonNegativeInt!, $regLimit: PaginationLimit!${customFieldParam}) {' +
             'event(id: $eventId) {' +
             'id,' +
             'name,' +
@@ -150,8 +59,9 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             'endDate,' + 
             'logo{' +
             'url,' +
-            '},' +
+            '},' + 
             'contacts(offset: $conoffset, limit: $contactsLimit) { ' +
+            '${customFieldsSection}' + // Placeholder for custom fields
             'marketingRecords(limit: 15){' +
             'id,' +
             'name,' +
@@ -222,10 +132,25 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             '"eventId": "' + strEventId + '",' +
             '"contactsLimit": ' + contactsLimit + ',' +
             '"conoffset": ' + lstcustsett[0].Offset__c + ',' +
-            '"regLimit": ' + regLimit +            
+            '"regLimit": ' + regLimit +
+            '${customVariables}' + // Placeholder for custom variables        
             '}' +
             '}';
+
+        // Determine custom parts based on RecordType
+        String customFieldsSection = '';
+        String customFieldParam = '';
+        String customVariables = '';
+
+        if (RecordType != 'Mumbrella') {
+            customFieldParam = ', $input: CustomFieldSearchFilterInput!';
+            customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
+            customVariables = ', "input": { "names": ["Industry" , "Company Size" , "Job Function"] }';
         }
+
+        // Replace placeholders in the template
+        graphqlQuery = commonQueryTemplate.replace('${customFieldParam}', customFieldParam).replace('${customFieldsSection}', customFieldsSection).replace('${customVariables}', customVariables);
+        
 
         // Prepare the HTTP request
         Http http = new Http();
@@ -273,14 +198,24 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
         
         // Serialize the ResponseWrapper to a JSON string
-        String serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
+        String serializedResponseWrapper;
+        Map<String, Object> jsonResponse;
+        Map<String, Object> eventDatamap;
+
+        if (responseWrapper.size() > 0) {
+            serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
+
+            // Deserialize the JSON string into a map
+            jsonResponse = (Map<String, Object>) JSON.deserializeUntyped(serializedResponseWrapper);
+        }
         
-        // Deserialize the JSON string into a map
-        Map<String, Object> jsonResponse = (Map<String, Object>) JSON.deserializeUntyped(serializedResponseWrapper);
-            
-        // Extract the 'data' map from the JSON response
-        Map<String, Object> eventDatamap = (Map<String, Object>) jsonResponse.get('data');        
-        
+        if (jsonResponse != null) {
+            // Extract the 'data' map from the JSON response
+            if (jsonResponse.containsKey('data') && jsonResponse.get('data') != null) {
+                eventDatamap = (Map<String, Object>) jsonResponse.get('data');
+            } 
+        }
+
         Map<String, Object> eventmap;
         // Extract the 'event' map from the 'data' map, if present
         if(eventDatamap != null) {
@@ -288,9 +223,9 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         }
 
         // Query for the event record based on the specified Event ID
-        List<Event__c> lstevent = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, New_Event_Logo__c, Is_Pricebook_Created__c,Event_Category__c
+        List<Event__c> lstevent = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, New_Event_Logo__c, Is_Pricebook_Created__c, Event_Category__c
                                    FROM Event__c
-                                   WHERE Id =: sfeventId  ORDER BY CreatedDate DESC LIMIT 1];
+                                   WHERE Id =: sfeventId ORDER BY CreatedDate DESC LIMIT 1];
         
         // Initialize lists to update events and insert pricebooks
         List<Event__c> updteventlst = new List<Event__c>();
@@ -308,38 +243,40 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             // Query for existing pricebooks associated with the event
             List<Pricebook2> lstPriceook = [SELECT Id FROM Pricebook2 WHERE Events__c =: sfeventId];
 
-            // Check if the pricebook is already created or missing and needs to be created
-            if(lstevent[0].Is_Pricebook_Created__c == false || (lstevent[0].Is_Pricebook_Created__c == true && lstPriceook.size() == 0)) {
-               
-                // Create a new Pricebook2 record
-                Pricebook2 newPricebook = new Pricebook2();
-                newPricebook.Name = (String) eventmap.get('name') + ' Visitor'; 
-                newPricebook.Events__c = sfeventId;
-                newPricebook.Description = 'Description of the pricebook'; 
-                newPricebook.IsActive = true; // Set the pricebook as active
-                lstInsrtPricebook.add(newPricebook);
+            for (Event__c eventRec : lstevent) {
                 
-                // Mark the event as having its pricebook created
-                lstevent[0].Is_Pricebook_Created__c = true;
+                // Check if the pricebook is already created or missing and needs to be created
+                if(eventRec.Is_Pricebook_Created__c == false || (eventRec.Is_Pricebook_Created__c == true && lstPriceook.size() == 0)) {
+                    
+                    // Create a new Pricebook2 record
+                    Pricebook2 newPricebook = new Pricebook2();
+                    newPricebook.Name = (String) eventmap.get('name') + ' Visitor'; 
+                    newPricebook.Events__c = eventRec.Id;
+                    newPricebook.Description = 'Description of the pricebook'; 
+                    newPricebook.IsActive = true; // Set the pricebook as active
+                    lstInsrtPricebook.add(newPricebook);
+    
+                    // Mark the event as having its pricebook created
+                    eventRec.Is_Pricebook_Created__c = true;
+                } 
+                            
+                if(eventRec.Event_Category__c != null){
+                    eventCategory = eventRec.Event_Category__c; 
+                }
+    
+                if(evtLogo != null) {
+                    eventRec.Event_Logo__c = evtLogo;
+                } 
+    
+                if (evtStartDate != null) {
+                    eventRec.Open_Date__c = (Datetime) JSON.deserialize('"' + evtStartDate + '"', Datetime.class);     
+                }
+    
+                if (evtCloseDate != null) {
+                    eventRec.Close_Date__c = (Datetime) JSON.deserialize('"' + evtCloseDate + '"', Datetime.class);     
+                } 
+                updteventlst.add(eventRec);
             }
-
-            if(lstevent[0].Event_Category__c != null){
-                eventCategory = lstevent[0].Event_Category__c; 
-            }
-
-            if(evtLogo != null) {
-                lstevent[0].Event_Logo__c = evtLogo;
-            }
-
-            if (evtStartDate != null) {
-                lstevent[0].Open_Date__c = (Datetime) JSON.deserialize('"' + evtStartDate + '"', Datetime.class);     
-            }
-
-            if (evtCloseDate != null) {
-                lstevent[0].Close_Date__c = (Datetime) JSON.deserialize('"' + evtCloseDate + '"', Datetime.class);     
-            }
-            
-            updteventlst.add(lstevent[0]);
         }
         
         //update event list
@@ -406,7 +343,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                     // If organization name is missing, add domain name for account creation
                     if (orgNameForAccCreation == null || orgNameForAccCreation == '') {
                         AccountName = domainname;
-                        AccountNamesForCheckCreation.add(emailparts[1].trim().toLowerCase());
+                        AccountNamesForCheckCreation.add(domainname);
                         accNeedToCreatePreName.put(AccountName, domainname);
                     }
                 }
@@ -577,21 +514,21 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         // fetch contact from sf based on combined String
         List<Contact> listOfAllContact = [SELECT Id, FirstName, LastName, Email, CombinedString__c FROM Contact
                                              WHERE CombinedString__c in :setOfCombinedEventsAirAttendee];
-        Map<String, Contact> mapOfContactStringAndContact = new Map<String, Contact>();
+        Map<String, Boolean> mapOfUniqueContactString = new Map<String, Boolean>();
             
         //loop through existing Contacts and fill the map to use for mapping with function registration
         for(Contact objContact :listOfAllContact){
-            mapOfContactStringAndContact.put(objContact.CombinedString__c, objContact); 
+            mapOfUniqueContactString.put(objContact.CombinedString__c, true); 
         }
 
         // fetch Lead from sf based on combined String
         List<Lead> listOfAllLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead
                                           WHERE CombinedString__c in :setOfCombinedEventsAirAttendee];
-        Map<String, Lead> mapOfLeadStringAndLead = new Map<String, Lead>();
+        Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
             
         //loop through existing Leads and fill the map to use for mapping with function registration
         for(Lead objLead :listOfAllLead){
-            mapOfLeadStringAndLead.put(objLead.CombinedString__c, objLead); 
+            mapOfUniqueLeadString.put(objLead.CombinedString__c, true); 
         }
 
         // loop through event's air contact for create Lead/Contact based on Paid/Unpaid function registrations
@@ -634,7 +571,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                     String CombinedString = getCombinedString(objeventcon);
                 
                     //create contact and account in salesforce if not exist for paid registartions
-                    if(totalcharge > 0 && !mapOfContactStringAndContact.containsKey(CombinedString)) {
+                    if(totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString)) {
                     
                         // contact creation for paid function registrations
                         Contact objcon = new Contact();
@@ -707,7 +644,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                         lstInsrtCon.add(objcon);
                     } else {
                         // create lead for unpaid function registration if CombinedString is not found in exiting contact OR in lead
-                        if(!mapOfContactStringAndContact.containsKey(CombinedString) && !mapOfLeadStringAndLead.containsKey(CombinedString)){
+                        if(!mapOfUniqueContactString.containsKey(CombinedString) && !mapOfUniqueLeadString.containsKey(CombinedString)){
         
                             //lead field mapping
                             Lead newLead = new Lead();
@@ -775,7 +712,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                             }
                             newLead.Status = 'New';
                             lstInsrtLead.add(newLead);
-                            mapOfLeadStringAndLead.put(newLead.CombinedString__c , newLead);
+                            mapOfUniqueLeadString.put(newLead.CombinedString__c , true);
                         }
                     }
                 }
@@ -785,11 +722,11 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
 
         // Insert Contacts
         if (!lstInsrtCon.isEmpty()) {            
-            insertContactsIfNotExist(lstInsrtCon, setOfCombinedEventsAirAttendee);   
+            insertContactsIfNotExist(lstInsrtCon, mapOfUniqueContactString);   
             system.debug('insertContactsIfNotExist');
         }
 
-        // fetch all contact
+        // fetch all contact after creating new contact records
         List<Contact> LstOfExtistingContact = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Contact 
                                                 WHERE CombinedString__c in :setOfCombinedEventsAirAttendee];            
         
@@ -799,7 +736,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         
         // Insert Lead
         if (!lstInsrtLead.isEmpty()) {
-            insertLeadsIfNotExist(lstInsrtLead, setOfCombinedEventsAirAttendee); 
+            insertLeadsIfNotExist(lstInsrtLead, mapOfUniqueLeadString); 
             system.debug('insertLeadsIfNotExist');
         }
 
@@ -1064,16 +1001,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     }  
 
     // Method for insert only new Contacts if not exist in salesforce
-    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Set<String> setOfCombinedEventsAirAttendee) {
-
-        //fetch existing Contacts based on Combined name
-        List<Contact> LstOfExtistingContact = [Select Id,FirstName, LastName,Email,CombinedString__c from Contact where CombinedString__c in :setOfCombinedEventsAirAttendee];
-        
-        Map<String, Id> mapOfContactStringAndIds = new Map<String, Id>();
-        //loop through existing Contacts and fill the map
-        for(Contact objContact :LstOfExtistingContact){
-           mapOfContactStringAndIds.put(objContact.CombinedString__c, objContact.Id); 
-        }
+    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Map<String, Boolean> mapOfUniqueContactString) {
 
         List<Contact> FinalListOfContactToInsert = new List<Contact>();
         Set<String> setOfCurrentContactCombinedData = new Set<String>();
@@ -1085,7 +1013,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
             
             // check if contact is exist or not
-            if(!mapOfContactStringAndIds.ContainsKey(strcombinedEventsAirAttendee)){
+            if(!mapOfUniqueContactString.ContainsKey(strcombinedEventsAirAttendee)){
                 // for prevent adding duplicate contact in list
                 if(!setOfCurrentContactCombinedData.contains(strcombinedEventsAirAttendee)){
                     FinalListOfContactToInsert.add(objcontact);
@@ -1100,16 +1028,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     }
 
     // Method for insert only new Leads if not exist in salesforce
-    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Set<String> setOfCombinedEventsAirAttendee) {
-    
-        //fetch existing leads based on Combined name
-        List<Lead> LstOfExtistingLead = [Select Id,FirstName, LastName,Email,CombinedString__c from Lead where CombinedString__c in :setOfCombinedEventsAirAttendee];
-        
-        Map<String, Id> mapOfLeadStringAndId = new Map<String, Id>();
-        //loop through existing leads and fill the map
-        for(Lead objLead :LstOfExtistingLead){
-            mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
-        }
+    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Map<String, Boolean> mapOfUniqueLeadString) {
 
         List<Lead> FinalListOfLeadToInsert = new List<Lead>();
         Set<String> setOfCurrentleadCombinedData = new Set<String>();
@@ -1119,7 +1038,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
             
             // check if lead exist or not
-            if(!mapOfLeadStringAndId.ContainsKey(strcombinedEventsAirAttendee)){
+            if(!mapOfUniqueLeadString.ContainsKey(strcombinedEventsAirAttendee)){
                 // for prevent adding duplicate lead in list
                 if(!setOfCurrentleadCombinedData.contains(strcombinedEventsAirAttendee)){
                     FinalListOfLeadToInsert.add(objLead);
@@ -1285,8 +1204,8 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         }
         
         if(finallisttoinsertOpp.size() > 0  && !test.isrunningtest()) {
-            allOpportunityList.addAll(finallisttoinsertOpp);
             insert finallisttoinsertOpp;
+            allOpportunityList.addAll(finallisttoinsertOpp);
         }
         return allOpportunityList;
     }
@@ -1303,12 +1222,9 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         
         //fetch pricebook
         List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId];
-        Pricebook2 standardPriceBook = [ SELECT Id FROM Pricebook2 WHERE isStandard = true LIMIT 1];
+        List<Pricebook2> lstStandardPriceBook = [ SELECT Id FROM Pricebook2 WHERE isStandard = true LIMIT 1];
         
-        //fetch opportunity which is inserted before
-        List<Opportunity> lstofOpportunity = [select id,Name,CreatedDate,EventsAir_Contact_Id__c from Opportunity where id in :allOpportunitiyList];
-        
-        for(Opportunity opp: lstofOpportunity) {
+        for(Opportunity opp: allOpportunitiyList) {
             mapOfEventConAndSFOppId.put(opp.EventsAir_Contact_Id__c, opp.Id);
             system.debug('mapOfEventConAndSFOppId'+mapOfEventConAndSFOppId);
         }
@@ -1382,11 +1298,11 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
             if(finallisttoinsertproduct.size() >0) {
                 system.debug(' finallisttoinsertproduct'+finallisttoinsertproduct);
                 insert finallisttoinsertproduct;
-            }
 
-            // fill map with product events air Id and sf product Id
-            for(Product2 prod: finallisttoinsertproduct) {
-                mapOfEvnproandSfId.put(prod.EventsAir_ID__c, prod.Id);
+                // fill map with product events air Id and sf product Id
+                for(Product2 prod: finallisttoinsertproduct) {
+                    mapOfEvnproandSfId.put(prod.EventsAir_ID__c, prod.Id);
+                }
             }
             system.debug(' mapOfEvnproandSfId'+mapOfEvnproandSfId);
         }
@@ -1421,8 +1337,8 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
                                 PricebookEntry pbEntry = new PricebookEntry();
                                 pbEntry.Product2Id = mapOfEvnproandSfId.get(strRegTypeId);
 
-                                if(standardPriceBook != null){
-                                    pbEntry.Pricebook2Id = standardPriceBook.Id;  
+                                if(lstStandardPriceBook.size() > 0){
+                                    pbEntry.Pricebook2Id = lstStandardPriceBook[0].Id;  
                                 }
                                 
                                 pbEntry.UnitPrice = (decimal) feemap.get('amount');
@@ -1464,45 +1380,38 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         if(!lstInsertPricebookEntry.isEmpty()) {
             
             //check for existing pricebookentry start
-            Set<String> setOfPricebookProductIds = new Set<String>();
+            Set<String> setOfPBEntryRegTypeIds = new Set<String>();
             for (PricebookEntry newpricebookentry : lstInsertPricebookEntry) {
-                setOfPricebookProductIds.add(newpricebookentry.Product2Id);
+                setOfPBEntryRegTypeIds.add(newpricebookentry.EventsAir_Type_ID__c);
             }
             List<PricebookEntry> lstexistingPricebookentry = [SELECT Id, Name, Product2.Name, EventsAir_Type_ID__c, UnitPrice
                                                               FROM PricebookEntry 
-                                                              WHERE Product2Id IN: setOfPricebookProductIds];
+                                                              WHERE EventsAir_Type_ID__c IN: setOfPBEntryRegTypeIds];
             
             Map<String, Boolean> mapofpricebookentry = new Map<String, Boolean>();
             
             for(PricebookEntry pb: lstexistingPricebookentry) {
-                mapofpricebookentry.put(pb.Product2Id, true);
+                mapofpricebookentry.put(pb.EventsAir_Type_ID__c, true);
             }
             
             List<PricebookEntry> finallsttoinsrtPB = new List<PricebookEntry>();
             
             for(PricebookEntry objPB: lstInsertPricebookEntry) {
-                if(!mapofpricebookentry.containsKey(objPB.Product2Id)) {
+                if(!mapofpricebookentry.containsKey(objPB.EventsAir_Type_ID__c)) {
                     finallsttoinsrtPB.add(objPB);
                 }
             }
             
             if(!finallsttoinsrtPB.isEmpty()) {
                 insert finallsttoinsrtPB;
+                lstexistingPricebookentry.addAll(finallsttoinsrtPB);
             }
             
             //fill mapOfEventRegTypeIdAndSFPBentryId Map
-            //loop through existing pricebookentry list
+            //loop through pricebookentry list
             for(PricebookEntry objexistingPBEntry: lstexistingPricebookentry) {
                 mapOfEventRegTypeIdAndSFPBentryId.put(objexistingPBEntry.EventsAir_Type_ID__c, objexistingPBEntry.Id);
-                mapOfEventRegTypeIdAndSFPBentryPrice.put(objexistingPBEntry.EventsAir_Type_ID__c, objexistingPBEntry.UnitPrice);                        
-            }
-            
-            //loop through new pricebookentry list
-            for(PricebookEntry objnewPBEntry: finallsttoinsrtPB) {
-                mapOfEventRegTypeIdAndSFPBentryId.put(objnewPBEntry.EventsAir_Type_ID__c, objnewPBEntry.Id);
-                mapOfEventRegTypeIdAndSFPBentryPrice.put(objnewPBEntry.EventsAir_Type_ID__c, objnewPBEntry.UnitPrice);
-            }
-            
+            }  
         }  
         
         // loop through eventsAir contacts
@@ -1640,8 +1549,8 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         Map<string,OpportunityLineItem> MapOfEventsairRegIdandOLI = new Map<string,OpportunityLineItem>();
         
         for(OpportunityLineItem oli : listOliForLinkOppWithReg){
-            LstOfEventsairRegId.add(oli.EventsAir_Regisration_ID__c);
-            MapOfEventsairRegIdandOLI.put(oli.EventsAir_Regisration_ID__c,oli);    
+            LstOfEventsairRegId.add(oli.Function_Registration_Id__c);
+            MapOfEventsairRegIdandOLI.put(oli.Function_Registration_Id__c,oli);    
         }
 
         // fetch all function registration with eventsAir function registration Id found in List " LstOfEventsairRegId "

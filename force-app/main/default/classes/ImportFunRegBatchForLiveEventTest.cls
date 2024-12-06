@@ -40,46 +40,9 @@ public class ImportFunRegBatchForLiveEventTest {
         ld.Company = 'Unknown';
         insert ld;
         
-        
-        Pricebook2 pb1 = new Pricebook2();
-        pb1.Name = 'vandanaTest';
-        pb1.Events__c = testEvent.id;
-        insert pb1;
-        
-        List<Pricebook2> lstofpricebook = new List<Pricebook2>();
-        
-        Pricebook2 pb = new Pricebook2();
-        pb.Name = 'vandanaTest';
-        // pb.Events__c = testEvent.id;
-        //pb.isStandard = true;
-        lstofpricebook.add(pb);
-        insert lstofpricebook;
-        
         Pricebook2 standardPricebook = new Pricebook2(Id =Test.getStandardPricebookId(),IsActive = true);
         update standardPricebook;
-        
-        Product2 objProduct2=new Product2();
-        objProduct2.Name='SSP - Comprehensive - E';
-        objProduct2.ProductCode = 'Pro-D';
-        insert objProduct2;
-        
-        List<Pricebook2> objPricebook = [Select id,Name from PriceBook2 where isStandard =: true];
-        Id standardPB = Test.getStandardPricebookId();  
-        
-        PricebookEntry objpricebookentry =new PricebookEntry();
-        objpricebookentry.Product2ID = objProduct2.id;
-        objpricebookentry.UnitPrice=23.50;
-        objpricebookentry.UseStandardPrice=false;
-        objpricebookentry.Pricebook2ID=standardPB;
-        objpricebookentry.isActive=true;
-        insert objpricebookentry;
-         
-          // Schedule the batch job
-        String jobName = 'Test Function Registration Batch Job';
-        String cronExpression = '0 0 */2 * * ?'; // Every 2 hours
-        
-         
-        
+
         Test.startTest();
         
          // System.schedule(jobName, cronExpression, new FunctionRegLiveEventBatchScheduler());
