@@ -43,9 +43,13 @@ public class ImportFunRegBatchForLiveEventTest {
         Pricebook2 standardPricebook = new Pricebook2(Id =Test.getStandardPricebookId(),IsActive = true);
         update standardPricebook;
 
+          // Schedule the batch job
+        String jobName = 'Test Function Registration Batch Job';
+        String cronExpression = '0 0 */2 * * ?'; // Every 2 hours
+        
         Test.startTest();
         
-         // System.schedule(jobName, cronExpression, new FunctionRegLiveEventBatchScheduler());
+        //  System.schedule(jobName, cronExpression, new FunctionRegLiveEventBatchScheduler());
         ImportFunRegBatchForLiveEvent batchInstance = new ImportFunRegBatchForLiveEvent();
         Database.executeBatch(batchInstance);
         ImportFunRegBatchForLiveEvent.generatestringMethod('Test1','Test2','Test3');
