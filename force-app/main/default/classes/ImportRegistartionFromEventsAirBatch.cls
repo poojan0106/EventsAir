@@ -187,7 +187,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         String serializedResponseWrapper;
         Map<String, Object> jsonResponse;
         Map<String, Object> eventDatamap;
-
+    try{
         if (responseWrapper.size() > 0) {
             serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
 
@@ -293,7 +293,14 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             lstcustsett[0].Is_Execute_Next__c = false; // Stop batch recursion
             lstcustsett[0].Offset__c = 0;
             update lstcustsett;
-        }            
+        }  
+    }catch(Exception e){
+        System.debug('ERROR:'+e.getMessage());
+        FeedItem post = new FeedItem();
+                post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+                post.Body = 'Unable to import registrations  \nERROR: '+e.getMessage();
+                insert post;    
+    }          
     }
     
     public void createRecords(List<Object> lsteventsairContacts) {
@@ -1320,6 +1327,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                                 pbEntry.UnitPrice = (decimal) feemap.get('amount');
                                 pbEntry.IsActive = true;
                                 pbEntry.UseStandardPrice = false;
+                                if(strRegTypeId != null) {
+                                   pbEntry.EventsAir_Type_ID__c = strRegTypeId;
+                                }  
                                 system.debug(' pricebook'+pbEntry);
                                 lstInsertPricebookEntry.add(pbEntry); 
                                 
@@ -1569,6 +1579,6 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                 post.Body = 'Apex batch End for fetching EventsAir Registration Data';
                 insert post;                
             }
-        }            
+        }     
     }
 }

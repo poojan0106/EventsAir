@@ -15,7 +15,7 @@ public class SyncEventsAirDataControllerForLWC {
         boolean flag; //set return value 
         
         //fetch EventAir external Id  
-        List<Event__c> lstevent = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, New_Event_Logo__c, Is_Pricebook_Created__c
+        List<Event__c> lstevent = [SELECT Id, Name,RecordType.Name, EventsAirID__c, Open_Date__c, Close_Date__c, New_Event_Logo__c, Is_Pricebook_Created__c
                                    FROM Event__c
                                    WHERE Id =: eventId LIMIT 1];         
         List<Event__c> updteventlst = new List<Event__c>(); //update event data list
@@ -33,7 +33,7 @@ public class SyncEventsAirDataControllerForLWC {
                 if(objevent.EventsAirID__c != null) {
                     
                     //access token callout
-                    strtoken = EventsAirOAuthTokenRequest.getAccessToken();
+                    strtoken = EventsAirOAuthTokenRequest.getAccessToken(objevent.RecordType.Name);
                       system.debug('@@strtoken ='+strtoken);
                     if(strtoken != null) {
                         

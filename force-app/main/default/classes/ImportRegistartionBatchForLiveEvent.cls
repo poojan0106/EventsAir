@@ -204,7 +204,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
         String serializedResponseWrapper;
         Map<String, Object> jsonResponse;
         Map<String, Object> eventDatamap;
-
+        try{
         if (responseWrapper.size() > 0) {
             serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
 
@@ -310,6 +310,13 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
             lstcustsett[0].Is_Execute_Next__c = false; // Stop batch recursion
             lstcustsett[0].Offset__c = 0;
             update lstcustsett;
+        }
+        }catch(Exception e){
+            System.debug('ERROR:'+e.getMessage());
+            FeedItem post = new FeedItem();
+                    post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+                    post.Body = 'Unable to import Registartions  \nERROR: '+e.getMessage();
+                    insert post;  
         }            
     }
     
@@ -1581,16 +1588,14 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                 System.debug('### sfeventId  = '+sfeventId);
 
                 // update event record
-                Event__c evnt = new Event__c();
                 if(sfeventId != null){
+                    Event__c evnt = new Event__c();
                     evnt.Id = sfeventId;
                     evnt.Next_Date__c = System.today();
                     updteventlstNextdt.add(evnt);
                     update updteventlstNextdt;
-                }
                 
-                FeedItem post = new FeedItem();
-                if(sfeventId != null){
+                    FeedItem post = new FeedItem();
                     post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
                     post.Body = 'Apex batch End for fetching EventsAir Registration Data';
                     insert post;  

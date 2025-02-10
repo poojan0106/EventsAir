@@ -29,8 +29,8 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
                                                                 from Manage_Eventsair_Fun_Reg_Apex_batch__c LIMIT 1];
     public ImportFunRegBatchForLiveEvent() {
         Date todayDate = Date.today();
-        List<Event__c> lstEvent = [SELECT Id, EventsAirID__c, Close_Date__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate and Registration_Types__c = null
-                                   and EventsAirID__c != null and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
+        List<Event__c> lstEvent = [SELECT Id, EventsAirID__c, Close_Date__c, Next_Date_For_Function_Registration__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate and Registration_Types__c = null
+                                   and EventsAirID__c != null and (Next_Date_For_Function_Registration__c = null  OR Next_Date_For_Function_Registration__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
         
         for(Event__c evnt: lstEvent) {
             sfeventId = evnt.Id;                // set Salesforce Event RecordId value in sfeventId
@@ -1758,16 +1758,16 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
                 Event__c evnt = new Event__c();
                 if(sfeventId != null){
                     evnt.Id = sfeventId;
-                    evnt.Next_Date__c = System.today();
+                    evnt.Next_Date_For_Function_Registration__c = System.today();
                     updteventlstNextdt.add(evnt);
                     update updteventlstNextdt;
-                }
                 
-                System.debug('### sfeventId  = '+sfeventId);
-                FeedItem post = new FeedItem();
-                post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                post.Body = 'Apex batch End for fetching function Registration EventsAir Data';
-                insert post;                
+                    System.debug('### sfeventId  = '+sfeventId);
+                    FeedItem post = new FeedItem();
+                    post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+                    post.Body = 'Apex batch End for fetching function Registration EventsAir Data';
+                    insert post; 
+                }               
             }
         }
         

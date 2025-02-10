@@ -65,6 +65,7 @@ wiredPageRef(pageRef) {
         }
         })
         .catch(error => {
+            console.log(error);
             const evt = new ShowToastEvent({
                 title:'Fail',
                 message:'Please Contact your System Administrator',
