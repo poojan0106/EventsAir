@@ -311,7 +311,7 @@ try{
             System.debug('ERROR==>'+ e.getMessage());
             FeedItem post = new FeedItem();
             post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-            post.Body = 'Unable to import Registartions. \nError : '+ e.getMessage();
+            post.Body = 'Unable to import Function Registartions. \nError : '+ e.getMessage();
             insert post;     
         }       
     }
@@ -1351,6 +1351,9 @@ try{
                                 pbEntry.UnitPrice = (decimal) feemap.get('amount');
                                 pbEntry.IsActive = true;
                                 pbEntry.UseStandardPrice = false;
+                                if(strRegTypeId != null) {
+                                    pbEntry.EventsAir_Type_ID__c = strRegTypeId;
+                                } 
                                 system.debug(' pricebook'+pbEntry);
                                 lstInsertPricebookEntry.add(pbEntry); 
                                 

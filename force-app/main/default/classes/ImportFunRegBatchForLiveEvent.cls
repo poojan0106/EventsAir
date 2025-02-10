@@ -201,7 +201,7 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
     }
     
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
-        
+    try{    
         // Serialize the ResponseWrapper to a JSON string
         String serializedResponseWrapper;
         Map<String, Object> jsonResponse;
@@ -311,7 +311,14 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
             lstcustsett[0].Is_Execute_Next__c = false; // Stop batch recursion
             lstcustsett[0].Offset__c = 0;
             update lstcustsett;
-        }        
+        }     
+    }catch(Exception e){
+        System.debug('ERROR:'+e.getMessage());
+        FeedItem post = new FeedItem();
+                post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+                post.Body = 'Unable to import Function registrations From Live Batch  \nERROR: '+e.getMessage();
+                insert post;    
+    }    
     }
     
     public void createRecords(List<Object> lsteventsairContacts) {
@@ -1349,6 +1356,9 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
                                 pbEntry.UnitPrice = (decimal) feemap.get('amount');
                                 pbEntry.IsActive = true;
                                 pbEntry.UseStandardPrice = false;
+                                if(strRegTypeId != null) {
+                                    pbEntry.EventsAir_Type_ID__c = strRegTypeId;
+                                } 
                                 system.debug(' pricebook'+pbEntry);
                                 lstInsertPricebookEntry.add(pbEntry); 
                                 

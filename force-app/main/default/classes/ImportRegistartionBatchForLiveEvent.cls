@@ -315,7 +315,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
             System.debug('ERROR:'+e.getMessage());
             FeedItem post = new FeedItem();
                     post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                    post.Body = 'Unable to import Registartions  \nERROR: '+e.getMessage();
+                    post.Body = 'Unable to import Registartions From Live Batch \nERROR: '+e.getMessage();
                     insert post;  
         }            
     }
@@ -1341,6 +1341,9 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                                 pbEntry.UnitPrice = (decimal) feemap.get('amount');
                                 pbEntry.IsActive = true;
                                 pbEntry.UseStandardPrice = false;
+                                if(strRegTypeId != null) {
+                                    pbEntry.EventsAir_Type_ID__c = strRegTypeId;
+                                } 
                                 system.debug(' pricebook'+pbEntry);
                                 lstInsertPricebookEntry.add(pbEntry); 
                                 

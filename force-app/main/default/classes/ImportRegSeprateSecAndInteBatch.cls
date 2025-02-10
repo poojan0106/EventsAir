@@ -233,7 +233,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     }
     
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
-        
+    try{   
         List<Event__c> eventData = [Select Id,Name,Registration_Types__c,RecordType.Name FROM Event__c where Id =:sfeventId LIMIT 1];
         if (String.isNotBlank(eventData[0].Registration_Types__c)) {
             List<String> selectedValues = eventData[0].Registration_Types__c.split(';');
@@ -308,7 +308,14 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
             lstcustsett[0].Is_Execute_Next__c = false; //This is used to stop batch to run in recursion
             lstcustsett[0].Offset__c = 0;
             update lstcustsett;
-        }            
+        }
+    }catch(Exception e){
+        System.debug('ERROR:'+e.getMessage());
+        FeedItem post = new FeedItem();
+                post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+                post.Body = 'Unable to import Security AND Integrate Seperate registrations  \nERROR: '+e.getMessage();
+                insert post;    
+    }             
     }
     
     public void createRecords(List<Object> lsteventsairContacts) {
@@ -1200,6 +1207,9 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                         pbEntry.UnitPrice = (decimal) feemap.get('amount');
                         pbEntry.IsActive = true;
                         pbEntry.UseStandardPrice = false;
+                        if(strRegTypeId != null) {
+                            pbEntry.EventsAir_Type_ID__c = strRegTypeId;
+                        } 
                         system.debug(' pricebook'+pbEntry);
                         lstInsertPricebookEntry.add(pbEntry); 
                         
