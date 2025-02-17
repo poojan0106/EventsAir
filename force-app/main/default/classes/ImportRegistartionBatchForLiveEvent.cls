@@ -358,10 +358,8 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                         accNeedToCreatePreName.put(AccountName, domainname);
                     }
                 }
-            }
-
-            // Process organization name for account creation if it exists
-            if(orgNameForAccCreation != null && orgNameForAccCreation != '') {
+            } else if(orgNameForAccCreation != null && orgNameForAccCreation != '') {
+                // Process organization name for account creation if it exists
                 if (orgNameForAccCreation.length() > 80) {
                     orgNameOfAccountInSF = orgNameForAccCreation.substring(0, 80);    
                 } else{
@@ -389,6 +387,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
             // Remove accounts by name and domain name         
             if(existingAccountsList.size() > 0) {
                 for(Account acc : existingAccountsList) {
+                    accNeedToCreatePreName.remove(acc.Domain_Name__c.toLowerCase());
                     accNeedToCreatePreName.remove(acc.Name.toLowerCase());
                 }
             }

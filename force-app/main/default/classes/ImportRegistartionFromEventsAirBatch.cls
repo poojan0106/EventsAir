@@ -27,6 +27,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     List<Manage_Eventsair_Reg_Apex_batch__c> lstcustsett = [SELECT Id, Name, Offset__c, Is_Execute_Next__c 
                                                             FROM Manage_Eventsair_Reg_Apex_batch__c LIMIT 1];
     
+    //constructor
     public ImportRegistartionFromEventsAirBatch(String eventId, String strsfeventId) {        
         strEventId = eventId;      // set EventsAir Event RecordId value in strEventId
         sfeventId = strsfeventId;  // set Salesforce Event RecordId value in sfeventId
@@ -38,12 +39,12 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         List<Event__c> eventData = [Select Id, Name, RecordType.Name FROM Event__c where Id = :sfeventId LIMIT 1];
         
         if(eventData.size() > 0) {
-        	RecordType = eventData[0].RecordType.Name;    
-        }       
-    
-        // Get the OAuth token for the API based on the record type
+        	RecordType = eventData[0].RecordType.Name;  //set record type name
+        }           
+        
         String graphqlQuery;
         String strtoken;
+        // Get the OAuth token for the API based on the record type
         if (RecordType != null) {
             strtoken = EventsAirOAuthTokenRequest.getAccessToken(RecordType);
         }        
@@ -125,11 +126,11 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         '}' +
         '}';
 
-        // Determine custom parts based on RecordType
         String customFieldsSection = '';
         String customFieldParam = '';
         String customVariables = '';
 
+        // Determine custom parts based on RecordType
         if (RecordType != 'Mumbrella') {
             customFieldParam = ', $input: CustomFieldSearchFilterInput!';
             customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
@@ -139,7 +140,6 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         // Replace placeholders in the template
         graphqlQuery = commonQueryTemplate.replace('${customFieldParam}', customFieldParam).replace('${customFieldsSection}', customFieldsSection).replace('${customVariables}', customVariables);
         
-        // Prepare the HTTP request
         Http http = new Http();
         HttpRequest request = new HttpRequest();
         request.setTimeout(120000);
@@ -153,11 +153,10 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         HttpResponse response = http.send(request);
         System.debug('@@@@ response = ' + response.getBody());
     
-        // List to hold the deserialized response
-        List<ResponseWrapper> lstofresponseWrapper = new List<ResponseWrapper>();
+        List<ResponseWrapper> lstofresponseWrapper = new List<ResponseWrapper>(); // List to hold the deserialized response
         ResponseWrapper responseWrapper = new ResponseWrapper();
     
-        // Check for successful response
+        // If successful then deserialize response
         if (response.getStatusCode() == 200) {
             // Parse the response body and replace reserved keywords
             String responseBody = response.getBody(); 
@@ -187,7 +186,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         String serializedResponseWrapper;
         Map<String, Object> jsonResponse;
         Map<String, Object> eventDatamap;
-    try{
+        
+        //if any error occur while importing registartion then do chatter post related to event
+    	try{
         if (responseWrapper.size() > 0) {
             serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
 
@@ -282,7 +283,8 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         }
         System.debug('### lsteventsairContacts size = ' + lsteventsairContacts.size());
     
-        // If contacts are found, create records for them
+        //If contacts are found from eventsair then 
+        //create contact/attendee and Registartion records in salesforce
         if(lsteventsairContacts.size() > 0) {
             createRecords(lsteventsairContacts);
         }       
@@ -294,15 +296,17 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             lstcustsett[0].Offset__c = 0;
             update lstcustsett;
         }  
-    }catch(Exception e){
-        System.debug('ERROR:'+e.getMessage());
-        FeedItem post = new FeedItem();
-                post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                post.Body = 'Unable to import registrations  \nERROR: '+e.getMessage();
-                insert post;    
-    }          
+    }
+        catch(Exception e) {
+            System.debug('ERROR:'+e.getMessage());
+            FeedItem post = new FeedItem();
+            post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+            post.Body = 'Unable to import registrations  \nERROR: '+e.getMessage();
+            insert post;    
+        }          
     }
     
+    //create records in salesforce 
     public void createRecords(List<Object> lsteventsairContacts) {
         
         // Lists to store records for insertion
@@ -341,10 +345,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                         accNeedToCreatePreName.put(AccountName, domainname);
                     }
                 }
-            }
+            } else if(orgNameForAccCreation != null && orgNameForAccCreation != '') {
 
-            // Process organization name for account creation if it exists
-            if(orgNameForAccCreation != null && orgNameForAccCreation != '') {
+                // Process organization name for account creation if it exists
                 if (orgNameForAccCreation.length() > 80) {
                     orgNameOfAccountInSF = orgNameForAccCreation.substring(0, 80);    
                 } else{
@@ -371,6 +374,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             // Remove accounts by name and domain name         
             if(existingAccountsList.size() > 0) {
                 for(Account acc : existingAccountsList) {
+                    accNeedToCreatePreName.remove(acc.Domain_Name__c.toLowerCase());
                     accNeedToCreatePreName.remove(acc.Name.toLowerCase());
                 }
             }
@@ -460,7 +464,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             System.debug('Account Inserted Successfully');
         }
         
-        // if domain not match, check for account name and create map for account name with account Id
+        // fetch existing account and preapared map
         Map<String, String> MapOfexistingAccountsOrgNameAndAccountId = new Map<String, String>();
         if (AccountNamesForCheckCreation != null) {
             
@@ -1138,7 +1142,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         
     }
 
-    // method to insert new Opportunity(no duplicates) in salesforce
+    //Method for insert only new Opportunity if not exist in salesforce
     public List<Opportunity> insertOpportunityIfNotExist(List<Opportunity> lstInsrtOpp) {
     
         Map<String, Id> mapOfEvnconIdandSfOppId = new Map<String, Id>();
@@ -1581,4 +1585,5 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
             }
         }     
     }
+    
 }
