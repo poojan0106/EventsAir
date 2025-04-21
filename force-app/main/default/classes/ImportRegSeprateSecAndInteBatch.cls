@@ -431,7 +431,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 MapOfexistingAccountsOrgNameAndAccountId.put(acct.Name.toLowerCase(),acct.Id);
             }
         }
-
+ 
         //if set contains any value then do soql on account and fill the mapOfDomainNameAndAccId Map
         if(setOfDomainNames != null) {
 
