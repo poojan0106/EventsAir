@@ -25,7 +25,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
     String RecordType;
 
     //fetch current offset value from custom setting
-    List<Manage_Eventsair_Reg_batch_Live_Event__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c 
+    List<Manage_Eventsair_Reg_batch_Live_Event__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c,Generic_Email_Domains__c 
                                                                   from Manage_Eventsair_Reg_batch_Live_Event__c LIMIT 1];
     
     
@@ -332,6 +332,11 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
         Map<String, Id> mapOfDomainNameAndAccId = new Map<String, Id>();
         Map<String, Id> mapOfDomainNameAndAccOwnerId = new Map<String, Id>();
 
+        Set<String> setOfGenericDomain = new Set<String>();
+        if (lstcustsett.size() > 0 && lstcustsett[0].Generic_Email_Domains__c != null && lstcustsett[0].Generic_Email_Domains__c != '') {
+            setOfGenericDomain = new Set<String>(lstcustsett[0].Generic_Email_Domains__c.split(','));
+        }
+     
         // Loop through event contacts to process email domain and organization names
         for (Object objEventCon : lsteventsairContacts) {
             Map<String, Object> eventConMap = (Map<String, Object>) objEventCon;
@@ -403,16 +408,31 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
         List<Account> listAccPreCreate = new List<Account>();
         for (String accName : accountNameMap.keySet()) {
             String newDomain = accountNameMap.get(accName);
-            if ((!setOfExistingAccountNameAndDomain.contains(newDomain.toLowerCase()) && !setOfExistingAccountNameAndDomain.contains(accName.toLowerCase())) 
-                && paidAccountNames.contains(accName.toLowerCase())) {
-                Account newAccount = new Account();
-                newAccount.RecordTypeId = (RecordType == 'Mumbrella') ? 
-                    Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId() : 
-                    Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Diversified').getRecordTypeId();
-                newAccount.Domain_Name__c = accountNameMap.get(accName);
-                newAccount.AccountSource = 'EventsAir';
-                newAccount.Name = accName;
-                listAccPreCreate.add(newAccount);
+            if(!setOfGenericDomain.contains(newDomain)) {
+                if ((!setOfExistingAccountNameAndDomain.contains(newDomain.toLowerCase()) && !setOfExistingAccountNameAndDomain.contains(accName.toLowerCase())) 
+                    && paidAccountNames.contains(accName.toLowerCase())) {
+                    Account newAccount = new Account();
+                    newAccount.RecordTypeId = (RecordType == 'Mumbrella') ? 
+                        Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId() : 
+                        Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Diversified').getRecordTypeId();
+                    newAccount.Domain_Name__c = accountNameMap.get(accName);
+                    newAccount.AccountSource = 'EventsAir';
+                    newAccount.Name = accName;
+                    listAccPreCreate.add(newAccount);
+                }
+            }else {
+                System.debug('Generic Domain Name found in the list :- ' + accName);
+                if (!setOfExistingAccountNameAndDomain.contains(accName.toLowerCase())) {
+                    Account newAccount = new Account();
+                    newAccount.RecordTypeId = (RecordType == 'Mumbrella') ? 
+                        Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId() : 
+                        Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Diversified').getRecordTypeId();
+                    newAccount.Domain_Name__c = accountNameMap.get(accName);
+                    newAccount.AccountSource = 'EventsAir';
+                    newAccount.Name = accName;
+                    listAccPreCreate.add(newAccount);
+                    
+                }
             }
         }
         
@@ -585,17 +605,25 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                             objcon.MobilePhone = (String) eventconphonemap.get('mobile');
                         } 
 
-                        // Assign AccountId to contact Prioirty :-  1) domain name match 2) organization name match                       
-                        if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
-                            objcon.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-                        } else if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
-                            System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccountId.get(orgName));
-                            objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
+                        if(setOfGenericDomain.contains(strAccdomainname)) {
+                            // Assign AccountId to contact Prioirty :- organization name match                       
+                            
+                            if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
+                                System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccountId.get(orgName));
+                                objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
+                            }
+                        } else {              
+                            // Assign AccountId to contact Prioirty :-  1) domain name match 2) organization name match                       
+                            if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
+                                objcon.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
+                            } else if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
+                                objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
+                            }  
                         }
                         lstInsrtCon.add(objcon);
                     } else {
                         // create lead for unpaid registration if CombinedString is not found in existing contact OR in lead
-                        if(!mapOfUniqueContactString.containsKey(CombinedString) && !mapOfUniqueLeadString.containsKey(CombinedString)){
+                        if(!mapOfUniqueLeadString.containsKey(CombinedString)){
 
                             //lead field mapping
                             Lead newLead = new Lead();
@@ -754,9 +782,11 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                     prodAndService.Marketing_Value__c = (String) prodAndSerMap.get('value');
 
                     if(Finalstring != null && Finalstring != '') {
-                        if(mapOfContactStringAndId.containsKey(Finalstring)) {
+                        if(mapOfContactStringAndId.containsKey(Finalstring) && mapOfLeadStringAndId.containsKey(Finalstring)) {
+                            prodAndService.Lead__c = mapOfLeadStringAndId.get(Finalstring);
+                        }else if(mapOfContactStringAndId.containsKey(Finalstring)){
                             prodAndService.Contact__c = mapOfContactStringAndId.get(Finalstring);
-                        }else{
+                        }else {
                             // connect with exiting or newly created lead
                             if(mapOfLeadStringAndId.containsKey(Finalstring)) {
                                 prodAndService.Lead__c = mapOfLeadStringAndId.get(Finalstring);
@@ -803,14 +833,14 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                             objreg.Contact__c = mapOfContactStringAndId.get(Finalstring);
                         }else {
                             // connect contact if it is created before
-                            if(mapOfContactStringAndId.containsKey(Finalstring)) {
-                                objreg.Contact__c = mapOfContactStringAndId.get(Finalstring);
-                            }else{
+                            // if(mapOfContactStringAndId.containsKey(Finalstring)) {
+                            //     objreg.Contact__c = mapOfContactStringAndId.get(Finalstring);
+                            // }else{
                                 // connect with exiting or newly created lead
                                 if(mapOfLeadStringAndId.containsKey(Finalstring)) {
                                     objreg.Lead__c = mapOfLeadStringAndId.get(Finalstring);
                                 }
-                            }
+                            // }
                         }
                     }
                     
