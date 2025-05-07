@@ -31,7 +31,7 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
     public ImportFunRegBatchForLiveEvent() {
         Date todayDate = Date.today();
         this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c,New_Event_Logo__c, Is_Pricebook_Created__c, Next_Date_For_Function_Registration__c, Event_Category__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate and Registration_Types__c = null
-                                   and EventsAirID__c != null and (Next_Date_For_Function_Registration__c = null  OR Next_Date_For_Function_Registration__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
+                                   and EventsAirID__c != null and (Registration_Types__c = null OR Registration_Types__c = '') and (Next_Date_For_Function_Registration__c = null  OR Next_Date_For_Function_Registration__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
         
         for(Event__c evnt: eventData) {
             sfeventId = evnt.Id;                // set Salesforce Event RecordId value in sfeventId

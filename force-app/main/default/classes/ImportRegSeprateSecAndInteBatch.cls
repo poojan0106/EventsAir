@@ -127,7 +127,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         if (RecordType != 'Mumbrella') {
             customFieldParam = ', $input: CustomFieldSearchFilterInput!';
             customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
-            customVariables = ', "input": { "names": ["Industry" , "Company Size" , "Job Function"] }';
+            customVariables = ', "input": { "names": ["Industry INT" , "Company Size" , "Job Function INT"] }';
         }
 
         // Replace placeholders in the template
@@ -431,7 +431,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 MapOfexistingAccountsOrgNameAndAccountId.put(acct.Name.toLowerCase(),acct.Id);
             }
         }
- 
+
         //if set contains any value then do soql on account and fill the mapOfDomainNameAndAccId Map
         if(setOfDomainNames != null) {
 
@@ -818,13 +818,15 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                     if(eventregPaymentdetails.get('paymentStatus') != null) {
                         objreg.Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');
                     }
-                    System.debug(objreg.Registration_Type__c);
-                    System.debug(selectedValuesMap);
-                    System.debug(selectedValuesMap.containsKey(objreg.Registration_Type__c));
-                    if (selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {
-                        
-                        lstInsrtReg.add(objreg);
+                    System.debug('@@@ test333 = '+objreg.Registration_Type__c);
+                    System.debug('@@@ selectedValuesMap = '+selectedValuesMap);
+                    System.debug('@@@ selectedValuesMap11 = '+selectedValuesMap.containsKey(objreg.Registration_Type__c));
+                    if(objreg.Registration_Type__c != null) {
+                        if (selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {                            
+                            lstInsrtReg.add(objreg);
+                        }
                     }
+                    
 
                     //  system.debug('totalcharge'+totalcharge);
                     if(totalcharge > 0) {
@@ -1505,18 +1507,20 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
                 update lstcustsett2;
                 
-                ImportRegSeprateSecAndInteBatch newBatch = new ImportRegSeprateSecAndInteBatch(sfeventId);
-                Database.executeBatch(newBatch, 500);
+                // ImportRegSeprateSecAndInteBatch newBatch = new ImportRegSeprateSecAndInteBatch(sfeventId);
+                // Database.executeBatch(newBatch, 500);
             }
             else {
                 lstcustsett2[0].Is_Execute_Next__c = true;
-                update lstcustsett2;
-                                
+                update lstcustsett2;                                
                 System.debug('### sfeventId  = '+sfeventId);
-                FeedItem post = new FeedItem();
-                post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                post.Body = 'Apex batch End for fetching EventsAir Registration Data';
-                insert post;                
+                
+                if(sfeventId != null) {
+                    FeedItem post = new FeedItem();
+                    post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+                    post.Body = 'Apex batch End for fetching EventsAir Registration Data';
+                    insert post; 
+                }                               
             }
         } 
     }
