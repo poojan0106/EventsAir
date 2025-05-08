@@ -1,0 +1,28 @@
+<apex:page standardController="Co_Exhibitor__c" recordSetVar="co">
+
+    <apex:includeLightning />
+    <div id="lightning"></div>
+
+    <script type='text/javascript'>
+        function getQueryParam(param) {
+            var urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param); // This returns the value of the 'id' parameter
+        }
+
+        // Extract Opportunity ID from the URL (i.e., the 'id' query parameter)
+        var opportunityId = getQueryParam('id');
+
+        console.log('opportunityId', opportunityId);
+        $Lightning.use("c:ImportCSVCloneApp", function () {
+            console.log("Lightning Out Initialized");
+            $Lightning.createComponent(
+                "c:importCSVClone",
+                { "opportunityId": opportunityId },
+                "lightning",
+                function (cmp) {
+                    console.log("OpportunityId:", opportunityId);
+                }
+            );
+        });
+    </script>
+</apex:page>

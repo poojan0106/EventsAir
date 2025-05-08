@@ -1,0 +1,3 @@
+<aura:component access="global">
+    <c:importCSVClone /> <!-- LWC -->
+</aura:component>

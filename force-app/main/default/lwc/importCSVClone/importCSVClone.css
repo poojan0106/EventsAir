@@ -1,0 +1,36 @@
+/* Centering the content in the card */
+    .center-content {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        height: 100%; /* Ensure it takes full height of the card */
+    }
+
+    /* Style for the file uploader */
+    .file-uploader {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 10px; /* Adds space between the elements */
+    }
+
+    /* Styling for the upload button */
+    .upload-button {
+        margin-top: 15px;
+    }
+    
+    .file-name {
+        color: green;
+        font-weight: bold;
+        font-size: 14px;
+    }
+    
+    .error-message {
+        color: red;
+        font-weight: bold;
+        white-space: pre-line;
+        font-size: 14px;
+    }

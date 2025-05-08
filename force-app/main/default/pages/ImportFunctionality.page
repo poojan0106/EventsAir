@@ -1,0 +1,36 @@
+<apex:page standardController="Co_Exhibitor__c" recordSetVar="coex">
+ 
+
+    <div class="center-container">
+        <div class="vf-lwc-container">
+            <apex:includeLightning />
+            <div id="lightning"></div>
+            <h1>
+                this sis vf page
+            </h1>
+            <script>
+                function getQueryParam(param) {
+                    var urlParams = new URLSearchParams(window.location.search);
+                    return urlParams.get(param); // This returns the value of the 'id' parameter
+                }
+
+                // Extract Opportunity ID from the URL (i.e., the 'id' query parameter)
+                var opportunityId = getQueryParam('id'); 
+                
+                console.log('opportunityId', opportunityId);
+
+                // Use Lightning to create the component
+                $Lightning.use("c:ImportFunctionalityApp", function () {
+                    $Lightning.createComponent(
+                        "c:importCSV",
+                        { "opportunityId": opportunityId },
+                        "lightning",
+                        function (cmp) {
+                            console.log("I am in importCSV cmp");
+                        }
+                    );
+                });
+            </script>
+        </div>
+    </div>
+</apex:page>

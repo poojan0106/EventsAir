@@ -89,7 +89,7 @@
                "organizationName":"Cleanup Services",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"test11@gmail.com",
                "primaryAddress":{
                   "city":null,
                   "country":"Australia",
@@ -200,7 +200,7 @@
                "organizationName":"Mp Associates Pty Ltd new test Mp Associates Pty Ltd 12345 Mp Associates Pty Ltd Mp Associates Pty Ltd",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"testrcs123@gmail.com",
                "primaryAddress":{
                   "city":null,
                   "country":"Australia",
@@ -365,7 +365,7 @@
                "organizationName":"Dimeo Cleaning",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"testrcs123@gmail.com",
                "primaryAddress":{
                   "city":null,
                   "country":"Australia",
@@ -1081,7 +1081,7 @@
                "organizationName":"ResourceCo Energy Systems",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"testrcs123@gmail.com",
                "primaryAddress":null,
                "contactPhoneNumbers":null,
                "registrations":[
@@ -3930,7 +3930,7 @@
                "organizationName":"Southern Sydney Regional Organisation of Councils",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"testrcs123@gmail.com",
                "primaryAddress":null,
                "contactPhoneNumbers":null,
                "registrations":[
@@ -8598,7 +8598,7 @@
                "organizationName":"Bingo",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"test12@gmail.com",
                "primaryAddress":null,
                "contactPhoneNumbers":null,
                "registrations":[
@@ -10323,7 +10323,7 @@
                "organizationName":"Infrastructure Partnerships Australia",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"test13@gmail.com",
                "primaryAddress":null,
                "contactPhoneNumbers":null,
                "registrations":[
@@ -10345,7 +10345,7 @@
                "organizationName":"",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"test14@gmail.com",
                "primaryAddress":null,
                "contactPhoneNumbers":null,
                "registrations":[
@@ -12352,7 +12352,7 @@
                "firstName":"Luis Miguel",
                "title":null,
                "lastModifiedAt":"2023-06-29T04:40:08.625Z",
-               "organizationName":"Luis Miguel Uribe Gonz√°lez",
+               "organizationName":"Luis Miguel Uribe Gonz·lez",
                "checkInDate":null,
                "checkOutDate":null,
                "primaryEmail":"luismi1988@gmail.com",
@@ -13430,7 +13430,7 @@
                "organizationName":"Repurpose It",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"test15@gmail.com",
                "primaryAddress":null,
                "contactPhoneNumbers":null,
                "registrations":[
@@ -14030,7 +14030,7 @@
                "organizationName":"Invest Northern Ireland",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"test16@gmail.com",
                "primaryAddress":null,
                "contactPhoneNumbers":null,
                "registrations":[
@@ -15119,7 +15119,7 @@
                "organizationName":"Redirect Recycle",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"test17@gmail.com",
                "primaryAddress":null,
                "contactPhoneNumbers":null,
                "registrations":[
@@ -15947,7 +15947,7 @@
                "organizationName":"Jackson Environment and Planning Pty Ltd",
                "checkInDate":null,
                "checkOutDate":null,
-               "primaryEmail":null,
+               "primaryEmail":"test18@gmail.com",
                "primaryAddress":null,
                "contactPhoneNumbers":null,
                "registrations":[

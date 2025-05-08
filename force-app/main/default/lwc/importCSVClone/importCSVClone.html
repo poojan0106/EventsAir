@@ -1,0 +1,22 @@
+<template>
+   <h1>Opportunity : {opportunityName}</h1>
+   <lightning-card title="Process CSV File">
+      <div class="file-uploader">
+         <lightning-input label="" name="file uploader" onchange={handleFilesChange} type="file"
+            multiple></lightning-input>
+         <template if:true={fileName}>
+            <p class="file-name">Uploaded File: {fileName}</p>
+         </template>
+
+         <!-- Error Message -->
+         <template if:true={errorMessage}>
+            <p class="error-message">{errorMessage}</p>
+         </template>
+         <lightning-button class="upload-button" label={UploadFile} onclick={handleSave} variant="brand"
+            disabled={isTrue}></lightning-button>
+      </div>
+   </lightning-card>
+
+   <lightning-button label="Back" onclick={handleBackClick} variant="neutral">
+   </lightning-button>
+</template>
