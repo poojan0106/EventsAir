@@ -19,6 +19,7 @@ public class ResponseWrapper {
         public String lastName;
         public String firstName;
         public String title;
+        public String jobTitle;
         public Datetime checkInDate;
         public Datetime checkOutDate;
         public String organizationName;

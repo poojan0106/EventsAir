@@ -1,4 +1,4 @@
-public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<ResponseWrapper>, Database.AllowsCallouts {
+public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<ResponseWrapper>, Database.AllowsCallouts {
     //variable declartion
     public String strEventId;
     public String sfeventId;
@@ -20,163 +20,169 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     public String RecordType;
 
     //fetch current offset value from custom setting
-    List<Manage_Eventsair_Sec_And_Int_Reg_batch__c> lstcustsett = [SELECT Id, Name, Offset__c, Is_Execute_Next__c,Generic_Email_Domains__c 
-                                                            FROM Manage_Eventsair_Sec_And_Int_Reg_batch__c LIMIT 1];
+    List<Manage_EvtAir_Sec_Inte_Reg_Live_Batch__c> lstcustsett = [SELECT Id, Name, Offset__c, Is_Execute_Next__c,Generic_Email_Domains__c 
+                                                                  FROM Manage_EvtAir_Sec_Inte_Reg_Live_Batch__c LIMIT 1];
 
-    public ImportRegSeprateSecAndInteBatch(String strsfeventId ) {        
-        this.eventData = [SELECT Id, Name, Open_Date__c, New_Event_Logo__c, Is_Pricebook_Created__c, Registration_Types__c, Event_Category__c, EventsAirID__c, Close_Date__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Id =:strsfeventId AND Registration_Types__c != null
-                                   AND EventsAirID__c != null limit 1 ];
-        if (eventData != null && eventData.size() > 0) {
-            
-            sfeventId = strsfeventId;
-            strEventId = eventData[0].EventsAirID__c;
-            RecordType = eventData[0].RecordType.Name;
+    public ImportRegSeprateSecAndInteLiveBatch () {        
+        Date todayDate = Date.today();
+        this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c, New_Event_Logo__c, Is_Pricebook_Created__c, Event_Category__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate AND Registration_Types__c != null AND Registration_Types__c != ''
+                                   and EventsAirID__c != null and (Registration_Types__c = null OR Registration_Types__c = '') and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc LIMIT 1 ];
+        
+        for(Event__c evnt: eventData) {
+            sfeventId = evnt.Id; // set Salesforce Event RecordId value in sfeventId for current EventData
+            strEventId = evnt.EventsAirID__c; // set EventsAir Event RecordId value in strEventId for currentEventData
+            RecordType = evnt.RecordType.Name;  // set current Salesforce Event Record's recordType Name
 
-            if(eventData[0].Event_Category__c != null){
-                eventCategory = eventData[0].Event_Category__c; 
+            if(evnt.Event_Category__c != null){
+                eventCategory = evnt.Event_Category__c; 
             }
-        }
+        }  
     }
     
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
+        List<ResponseWrapper> lstofresponseWrapper = new List<ResponseWrapper>(); // List to hold the deserialized response
+        if (sfeventId != null) {
+            
+            String graphqlQuery;
+            String strtoken;
+            // Get the OAuth token for the API based on the record type
+            if (RecordType != null) {
+                strtoken = EventsAirOAuthTokenRequest.getAccessToken(RecordType);
+            } 
         
-        String graphqlQuery;
-        String strtoken;
+            // Prepare the GraphQL query based on the record type
+            String commonQueryTemplate = '{' +
+            '"query": "query GetEventData($eventId: ID!, $contactsLimit: PaginationLimit!, $conoffset: NonNegativeInt!, $regLimit: PaginationLimit!${customFieldParam}) {' +
+            'event(id: $eventId) {' +
+            'id,' +
+            'name,' +
+            'startDate,' +
+            'endDate,' + 
+            'logo{' +
+            'url,' +
+            '},' + 
+            'contacts(offset: $conoffset, limit: $contactsLimit) { ' +
+            '${customFieldsSection}' + // Placeholder for custom fields
+            'marketingRecords(limit: 15){' +
+            'id,' +
+            'name,' +
+            'tag {' +
+            'id,' +
+            'name,' +
+            '},' +
+            'value' +
+            '},' +
+            'id,' +
+            'lastName,' +
+            'firstName,' +
+            'title,' +
+            'jobTitle,' +
+            'lastModifiedAt,' +
+            'organizationName,' +
+            'checkInDate,' +
+            'checkOutDate,' +
+            'primaryEmail,' +
+            'primaryAddress {' +
+            'city,' + 
+            'country,' + 
+            'line1,' + 
+            'line2,' + 
+            'line3,' + 
+            'postCode,' + 
+            'state,' + 
+            '},' +
+            'contactPhoneNumbers {' +
+            'mobile,' +      
+            '},' +          
+            'registrations(limit: $regLimit) {' +
+            'id,' +
+            'dateTime,' +   
+            'type {' +
+            'id,' +
+            'name,' +   
+            'uniqueCode,' + 
+            'fees {' +
+            'amount,' +      
+            '},' +
+            '},' +
+            'paymentDetails {' +
+            'paymentStatus,' +
+            'discountAmount,' +
+            'adjustmentAmount,' +
+            'taxAmount,' +
+            'totalChargeAmount,' +
+            'discountCode {' +
+            'code,' +
+            '},' +
+            '},' +
+            '},' +            
+            '}' +
+            '}' +
+            '}",' +
+            '"variables": {' +
+            '"eventId": "' + strEventId + '",' +
+            '"contactsLimit": ' + contactsLimit + ',' +
+            '"conoffset": ' + lstcustsett[0].Offset__c + ',' +
+            '"regLimit": ' + regLimit +
+            '${customVariables}' + // Placeholder for custom variables
+            '}' +
+            '}';
 
-        // Get the OAuth token for the API based on the record type
-        if (RecordType != null) {
-            strtoken = EventsAirOAuthTokenRequest.getAccessToken(RecordType);
-        } 
-    
-        // Prepare the GraphQL query based on the record type
-        String commonQueryTemplate = '{' +
-        '"query": "query GetEventData($eventId: ID!, $contactsLimit: PaginationLimit!, $conoffset: NonNegativeInt!, $regLimit: PaginationLimit!${customFieldParam}) {' +
-        'event(id: $eventId) {' +
-        'id,' +
-        'name,' +
-        'startDate,' +
-        'endDate,' + 
-        'logo{' +
-        'url,' +
-        '},' + 
-        'contacts(offset: $conoffset, limit: $contactsLimit) { ' +
-        '${customFieldsSection}' + // Placeholder for custom fields
-        'marketingRecords(limit: 15){' +
-        'id,' +
-        'name,' +
-        'tag {' +
-        'id,' +
-        'name,' +
-        '},' +
-        'value' +
-        '},' +
-        'id,' +
-        'lastName,' +
-        'firstName,' +
-        'title,' +
-        'jobTitle,' +
-        'lastModifiedAt,' +
-        'organizationName,' +
-        'checkInDate,' +
-        'checkOutDate,' +
-        'primaryEmail,' +
-        'primaryAddress {' +
-        'city,' + 
-        'country,' + 
-        'line1,' + 
-        'line2,' + 
-        'line3,' + 
-        'postCode,' + 
-        'state,' + 
-        '},' +
-        'contactPhoneNumbers {' +
-        'mobile,' +      
-        '},' +          
-        'registrations(limit: $regLimit) {' +
-        'id,' +
-        'dateTime,' +   
-        'type {' +
-        'id,' +
-        'name,' +   
-        'uniqueCode,' + 
-        'fees {' +
-        'amount,' +      
-        '},' +
-        '},' +
-        'paymentDetails {' +
-        'paymentStatus,' +
-        'discountAmount,' +
-        'adjustmentAmount,' +
-        'taxAmount,' +
-        'totalChargeAmount,' +
-        'discountCode {' +
-        'code,' +
-        '},' +
-        '},' +
-        '},' +            
-        '}' +
-        '}' +
-        '}",' +
-        '"variables": {' +
-        '"eventId": "' + strEventId + '",' +
-        '"contactsLimit": ' + contactsLimit + ',' +
-        '"conoffset": ' + lstcustsett[0].Offset__c + ',' +
-        '"regLimit": ' + regLimit +
-        '${customVariables}' + // Placeholder for custom variables
-        '}' +
-        '}';
+            String customFieldsSection = '';
+            String customFieldParam = '';
+            String customVariables = '';
 
-        String customFieldsSection = '';
-        String customFieldParam = '';
-        String customVariables = '';
-
-        if (RecordType != 'Mumbrella') {
-            customFieldParam = ', $input: CustomFieldSearchFilterInput!';
-            customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
-            if (eventCategory == 'Security') {
-                customVariables = ', "input": { "names": ["Industry SEC" , "Job Function SEC" , "Company Size"] }';
-            } else {
-                customVariables = ', "input": { "names": ["Industry INT" , "Job Function INT" , "Company Size"] }';
+            if (RecordType != 'Mumbrella') {
+                customFieldParam = ', $input: CustomFieldSearchFilterInput!';
+                customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
+                if (eventCategory == 'Security') {
+                    customVariables = ', "input": { "names": ["Industry SEC" , "Job Function SEC" , "Company Size"] }';
+                } else {
+                    customVariables = ', "input": { "names": ["Industry INT" , "Job Function INT" , "Company Size"] }';
+                }
             }
-        }
 
-        // Replace placeholders in the template
-        graphqlQuery = commonQueryTemplate.replace('${customFieldParam}', customFieldParam).replace('${customFieldsSection}', customFieldsSection).replace('${customVariables}', customVariables);
+            // Replace placeholders in the template
+            graphqlQuery = commonQueryTemplate.replace('${customFieldParam}', customFieldParam).replace('${customFieldsSection}', customFieldsSection).replace('${customVariables}', customVariables);
+            
+            Http http = new Http();
+            HttpRequest request = new HttpRequest();
+            request.setTimeout(120000);
+            request.setEndpoint(System.Label.EventsAir_API_Base_URL);
+            request.setMethod('POST');
+            request.setBody(graphqlQuery);
+            request.setHeader('Content-Type', 'application/json');
+            request.setHeader('Authorization', 'Bearer ' + strtoken);
         
-        Http http = new Http();
-        HttpRequest request = new HttpRequest();
-        request.setTimeout(120000);
-        request.setEndpoint(System.Label.EventsAir_API_Base_URL);
-        request.setMethod('POST');
-        request.setBody(graphqlQuery);
-        request.setHeader('Content-Type', 'application/json');
-        request.setHeader('Authorization', 'Bearer ' + strtoken);
-    
-        // Send the HTTP request
-        HttpResponse response = http.send(request);
-        System.debug('@@@@ response = ' + response.getBody());
-    
-        List<ResponseWrapper> lstofresponseWrapper = new List<ResponseWrapper>();
-        ResponseWrapper responseWrapper = new ResponseWrapper();
-    
-        if (response.getStatusCode() == 200) {
-
-            String responseBody = response.getBody(); 
-            responseBody = responseBody.replace('"dateTime"', '"registrationDateTime"');
-            responseBody = responseBody.replace('"date"', '"functiondate"');
-            responseBody = responseBody.replace('"end"', '"functionend"');
-    
-            responseWrapper = (ResponseWrapper) JSON.deserialize(responseBody, ResponseWrapper.class);
-            lstofresponseWrapper.add(responseWrapper);
-        } else {
-            // Update custom settings if the response contains an error
-            if(lstcustsett.size() > 0) {
-                lstcustsett[0].Is_Execute_Next__c = false;
-                lstcustsett[0].Offset__c = 0;
-                update lstcustsett;
-            }            
-        }
-    
+            // Send the HTTP request
+            HttpResponse response = http.send(request);
+            System.debug('@@@@ response = ' + response.getBody());
+        
+            ResponseWrapper responseWrapper = new ResponseWrapper();
+        
+            if (response.getStatusCode() == 200) {
+                String responseBody = response.getBody(); 
+                responseBody = responseBody.replace('"dateTime"', '"registrationDateTime"');
+                responseBody = responseBody.replace('"date"', '"functiondate"');
+                responseBody = responseBody.replace('"end"', '"functionend"');
+                responseWrapper = (ResponseWrapper) JSON.deserialize(responseBody, ResponseWrapper.class);
+                lstofresponseWrapper.add(responseWrapper);
+            } else {
+                // Update custom settings if the response contains an error
+                if(lstcustsett.size() > 0) {
+                    lstcustsett[0].Is_Execute_Next__c = false;
+                    lstcustsett[0].Offset__c = 0;
+                    update lstcustsett;
+                }            
+            }
+        }else {
+            // no need to perform http callout
+            System.debug('Salesforce id is null');
+            lstcustsett[0].Is_Execute_Next__c = false;
+            lstcustsett[0].Offset__c = 0;
+            update lstcustsett;
+        } 
+        // Return the response list
         return lstofresponseWrapper;
     }
     
@@ -276,18 +282,19 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 createRecords(lsteventsairContacts);
             }
             
-            if(lsteventsairContacts.isEmpty()) {
+            
+            if(lsteventsairContacts.isEmpty() && !eventData.isEmpty()) {
+                //update offset in custom setting
                 System.debug('@@@ All Data Synced');
                 lstcustsett[0].Is_Execute_Next__c = false;
                 lstcustsett[0].Offset__c = 0;
                 update lstcustsett;
             }
-
         }catch(Exception e) {
             System.debug('ERROR==>'+ e.getMessage());
             FeedItem post = new FeedItem();
                     post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                    post.Body = 'Unable to import Registrations For Security And Integrate Seperate \nError: '+e.getMessage();
+                    post.Body = 'Unable to import Registrations For Security AND Integrate Seperate Live Batch  \nError: '+e.getMessage();
                     insert post;    
         }             
     }
@@ -1652,13 +1659,12 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
             reg.Opportunity__c = MapOfEventsairRegIdandOLI.get(reg.EventsAir_Regisration_ID__c).OpportunityId;
         }   
         Database.update(lstOfRegistrationtoLink,false);   
-    }    
+    }   
 
     public void finish(Database.BatchableContext BC) {
         
         if(!test.isrunningtest()) {
-            List<Manage_Eventsair_Sec_And_Int_Reg_batch__c> lstcustsett2 = [SELECT Id, Name, Offset__c, Is_Execute_Next__c 
-                                                                     FROM Manage_Eventsair_Sec_And_Int_Reg_batch__c LIMIT 1];            
+            List<Manage_EvtAir_Sec_Inte_Reg_Live_Batch__c> lstcustsett2 = [SELECT Id, Name, Offset__c, Is_Execute_Next__c FROM Manage_EvtAir_Sec_Inte_Reg_Live_Batch__c LIMIT 1];         
             // Your finish logic goes here
             if(lstcustsett2[0].Is_Execute_Next__c == true) {
                 
@@ -1666,15 +1672,24 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                 lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
                 update lstcustsett2;
                 
-                ImportRegSeprateSecAndInteBatch newBatch = new ImportRegSeprateSecAndInteBatch(sfeventId);
+                ImportRegSeprateSecAndInteLiveBatch newBatch = new ImportRegSeprateSecAndInteLiveBatch();
                 Database.executeBatch(newBatch, 500);
             }
             else {
                 lstcustsett2[0].Is_Execute_Next__c = true;
-                update lstcustsett2;                                
+                update lstcustsett2; 
+
+                List<Event__c> updteventlstNextdt = new List<Event__c>();                              
                 System.debug('### sfeventId  = '+sfeventId);
                 
                 if(sfeventId != null) {
+
+                    Event__c evnt = new Event__c();
+                    evnt.Id = sfeventId;
+                    evnt.Next_Date__c = System.today();
+                    updteventlstNextdt.add(evnt);
+                    update updteventlstNextdt;
+
                     FeedItem post = new FeedItem();
                     post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
                     post.Body = 'Apex batch End for fetching EventsAir Registration Data';

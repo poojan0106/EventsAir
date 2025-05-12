@@ -32,7 +32,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
     public ImportRegistartionBatchForLiveEvent() {        
         Date todayDate = Date.today();
         // fetch event record from salesforce based on conditions
-        this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c, New_Event_Logo__c, Is_Pricebook_Created__c, Event_Category__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate and Registration_Types__c = null
+        this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c, New_Event_Logo__c, Is_Pricebook_Created__c, Event_Category__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate AND Registration_Types__c = null
                                    and EventsAirID__c != null and (Registration_Types__c = null OR Registration_Types__c = '') and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
         
         for(Event__c evnt: eventData) {
@@ -240,7 +240,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
         if (eventmap != null && !eventData.isEmpty()) { 
 
             // Query for existing pricebooks associated with the event
-            List<Pricebook2> lstPriceook = [SELECT Id FROM Pricebook2 WHERE Events__c =: eventData[0].Id LIMIT 50000];
+            List<Pricebook2> lstPriceook = [SELECT Id FROM Pricebook2 WHERE Events__c =: sfeventId LIMIT 50000];
         
             for (Event__c eventRec : eventData) {
                 
@@ -621,6 +621,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                             }  
                         }
                         lstInsrtCon.add(objcon);
+                        
                     } else {
                         // create lead for unpaid registration if CombinedString is not found in existing contact OR in lead
                         if(!mapOfUniqueLeadString.containsKey(CombinedString)){

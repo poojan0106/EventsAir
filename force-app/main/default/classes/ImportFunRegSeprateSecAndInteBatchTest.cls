@@ -48,9 +48,8 @@ public class ImportFunRegSeprateSecAndInteBatchTest {
         
         Test.startTest();
        // System.schedule(jobName, cronExpression, new ImportFunRegSepSecAndInteBatchscheduler());
-        ImportFunRegSeprateSecAndInteBatch batchInstance = new ImportFunRegSeprateSecAndInteBatch();
+        ImportFunRegSeprateSecAndInteBatch batchInstance = new ImportFunRegSeprateSecAndInteBatch(testEvent.Id);
         Database.executeBatch(batchInstance);
-        ImportFunRegSeprateSecAndInteBatch.isValidEmail('abc@gmail.com');
         Test.stopTest();
        
   }

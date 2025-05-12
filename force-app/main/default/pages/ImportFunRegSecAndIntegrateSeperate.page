@@ -1,0 +1,2 @@
+<apex:page standardController="Event__c" extensions="ImportFunRegSeprateSecAndIntController" action="{!executeBatch}" >
+</apex:page>

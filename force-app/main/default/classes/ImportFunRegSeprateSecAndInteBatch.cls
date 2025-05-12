@@ -7,7 +7,9 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
     Integer contactsLimit = Integer.valueOf(System.Label.EventsAirFun_Attendee_Contact_Limit);
     Integer regLimit = Integer.valueOf(System.Label.EventsAir_Function_Registartion_Limit);
     List<Contact> lstInsrtCon;
+    List<Contact> lstUpdateCon;
     List<Lead> lstInsrtLead;
+    List<Lead> lstUpdateLead;
     List<Product_Service_Option__c> lstInsrtProdAndServices;
     List<Function__c> lstInsrtFun; 
     public List<Event__c> eventData = new List<Event__c>();
@@ -17,38 +19,35 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
     Map<String, Id> mapOfEvnproandSfId = new Map<String, Id>();
     Map<String, String> selectedValuesMap = new Map<String, String>();
     Map<String, Id> mapOfEventRegTypeIdAndSFPBentryId = new Map<String, Id>();
-    String RecordType;
+    public String RecordType;
 
     //fetch current offset value from custom setting
-    List<Manage_Eventsair_Fun_Reg_Apex_batch__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c,Generic_Email_Domains__c from Manage_Eventsair_Fun_Reg_Apex_batch__c LIMIT 1];
+    List<Manage_EvtAir_Fun_Reg_Sec_And_Inte_Batch__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c,Generic_Email_Domains__c from Manage_EvtAir_Fun_Reg_Sec_And_Inte_Batch__c LIMIT 1];
     
-    public ImportFunRegSeprateSecAndInteBatch() {
-        Date todayDate = Date.today();
-        this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c,New_Event_Logo__c, Is_Pricebook_Created__c, Next_Date_For_Function_Registration__c, Event_Category__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate and Registration_Types__c != null and Registration_Types__c != ''
-                                   and EventsAirID__c != null and (Next_Date_For_Function_Registration__c = null  OR Next_Date_For_Function_Registration__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
-        
-        System.debug('%%% eventData = '+eventData);
-        for(Event__c evnt: eventData) {
-            sfeventId = evnt.Id;
-            strEventId = evnt.EventsAirID__c;
-        }          
+    public ImportFunRegSeprateSecAndInteBatch(String strsfeventId) {
+        this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c,New_Event_Logo__c, Is_Pricebook_Created__c, Next_Date_For_Function_Registration__c, Event_Category__c, RecordType.Name,Function_Registration_Types__c FROM Event__c WHERE Id =:strsfeventId AND Function_Registration_Types__c != null AND Function_Registration_Types__c != ''
+                                   AND EventsAirID__c != null limit 1 ];
+        if (eventData != null && eventData.size() > 0) {
+            sfeventId = strsfeventId;
+            strEventId = eventData[0].EventsAirID__c;
+            RecordType = eventData[0].RecordType.Name;
+            
+            if(eventData[0].Event_Category__c != null){
+                eventCategory = eventData[0].Event_Category__c; 
+            }
+        }
     }
     
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
         
-        if(eventData.size() > 0) {
-            RecordType = eventData[0].RecordType.Name;
-        }
-
-        //get access token
         String graphqlQuery;
         String strtoken;
         
+        // Get the OAuth token for the API based on the record type
         if (RecordType != null) {
             strtoken = EventsAirOAuthTokenRequest.getAccessToken(RecordType);
         }
         
-        //Prepare API Query   
         // Prepare the GraphQL query based on the record type 
         String commonQueryTemplate = '{' +
             '"query": "query GetEventData($eventId: ID!, $contactsLimit: PaginationLimit!, $conoffset: NonNegativeInt!, $regLimit: PaginationLimit!${customFieldParam}) {' +
@@ -75,6 +74,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             'lastName,' +
             'firstName,' +
             'title,' +
+            'jobTitle,' +
             'organizationName,' +
             'checkInDate,' +
             'checkOutDate,' +
@@ -137,7 +137,6 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             '}' +
             '}';
         
-        // Determine custom parts based on RecordType
         String customFieldsSection = '';
         String customFieldParam = '';
         String customVariables = '';
@@ -145,7 +144,11 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         if (RecordType != 'Mumbrella') {
             customFieldParam = ', $input: CustomFieldSearchFilterInput!';
             customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
-            customVariables = ', "input": { "names": ["Industry" , "Company Size" , "Job Function"] }';
+            if (eventCategory == 'Security') {
+                customVariables = ', "input": { "names": ["Industry SEC" , "Job Function SEC" , "Company Size"] }';
+            } else {
+                customVariables = ', "input": { "names": ["Industry INT" , "Job Function INT" , "Company Size"] }';
+            }
         }
         
         // Replace placeholders in the template
@@ -160,13 +163,11 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         request.setMethod('POST');
         request.setBody(graphqlQuery);
         request.setHeader('Content-Type', 'application/json');
-        
-        // Set the Authorization header
         request.setHeader('Authorization', 'Bearer ' + strtoken);
         
+        // Send the HTTP request        
         HttpResponse response = http.send(request);
-        System.debug('@@@ response = '+response);
-        System.debug('@@@@ response = '+response.getBody());
+        System.debug('@@@@ response = ' + response.getBody());
         
         List<ResponseWrapper> lstofresponseWrapper = new List<ResponseWrapper>();
         ResponseWrapper responseWrapper = new ResponseWrapper();
@@ -174,7 +175,6 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         if (response.getStatusCode() == 200) {
             
             String responseBody = response.getBody(); 
-            // Replace the with the correct format (reserved keyword)
             responseBody = responseBody.replace('"dateTime"', '"registrationDateTime"');
             responseBody = responseBody.replace('"date"', '"functiondate"');
             responseBody = responseBody.replace('"end"', '"functionend"');
@@ -199,16 +199,16 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             Map<String, Object> jsonResponse;
             Map<String, Object> eventDatamap;
 
-            if (String.isNotBlank(eventData[0].Registration_Types__c)) {
-                List<String> selectedValues = eventData[0].Registration_Types__c.split(';');
+            if (String.isNotBlank(eventData[0].Function_Registration_Types__c)) {
+                List<String> selectedValues = eventData[0].Function_Registration_Types__c.split(';');
                 for (String value : selectedValues) {
                     selectedValuesMap.put(value, value);
+                    System.debug('value = ' + value);
                 }
             }
             if (responseWrapper.size() > 0) {
                 serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
                 
-                // Deserialize the JSON string into a map
                 jsonResponse = (Map<String, Object>) JSON.deserializeUntyped(serializedResponseWrapper);
             }
             
@@ -220,7 +220,6 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             }
             
             Map<String, Object> eventmap;
-            // Extract the 'event' map from the 'data' map, if present
             if(eventDatamap != null) {
                 eventmap = (Map<String, Object>) eventDatamap.get('event');   
             }
@@ -258,10 +257,6 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                         eventRec.Is_Pricebook_Created__c = true;
                     } 
                     
-                    if(eventRec.Event_Category__c != null){
-                        eventCategory = eventRec.Event_Category__c; 
-                    }
-                    
                     if(evtLogo != null) {
                         eventRec.Event_Logo__c = evtLogo;
                     } 
@@ -287,25 +282,22 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                 insert lstInsrtPricebook;
             }
             
-            // Extract the list of contacts from the event map
             List<Object> lsteventsairContacts = new List<Object>();
             if(eventmap != null){
                 lsteventsairContacts = (List<Object>) eventmap.get('contacts'); 
             }
             
-            // If contacts are found, create records for them
-            if(lsteventsairContacts.size() > 0){
+            if(lsteventsairContacts.size() > 0) {
                 createRecords(lsteventsairContacts); 
             }
             
-            // If no contacts are found, update the custom setting to stop recursion
             if(lsteventsairContacts.isEmpty()) {
                 System.debug('@@@ All Data Synced');
-                lstcustsett[0].Is_Execute_Next__c = false; // Stop batch recursion
+                lstcustsett[0].Is_Execute_Next__c = false;
                 lstcustsett[0].Offset__c = 0;
                 update lstcustsett;
             } 
-        }catch(Exception e){
+        }catch(Exception e) {
             System.debug('ERROR==>'+ e.getMessage());
             FeedItem post = new FeedItem();
             post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
@@ -318,7 +310,9 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         
         // Lists to store records for insertion
         lstInsrtLead = new List<Lead>();
+        lstUpdateLead = new List<Lead>();
         lstInsrtCon = new List<Contact>();
+        lstUpdateCon = new List<Contact>();
         lstInsrtProdAndServices = new List<Product_Service_Option__c>();
         
         // Sets and Maps for handling domain names and account information
@@ -419,7 +413,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                         listAccPreCreate.add(newAccount);
                     }
             }else {
-                System.debug('Generic Domain Name found in the list :- ' + accName);
+                System.debug('Generic Domain Name found in the list');
                 if (!setOfExistingAccountNameAndDomain.contains(accName.toLowerCase())) {
                     Account newAccount = new Account();
                     newAccount.RecordTypeId = (RecordType == 'Mumbrella') ? 
@@ -479,23 +473,27 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         }
         
         // fetch contact from sf based on combined String
-        List<Contact> listOfAllContact = [SELECT Id, FirstName, LastName, Email, CombinedString__c FROM Contact
+        List<Contact> listOfAllContact = [SELECT Id, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c FROM Contact
                                           WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueContactString = new Map<String, Boolean>();
+        Map<String, Contact> mapOfUniqueContactStringToUpdate = new Map<String, Contact>();
         
         //loop through existing Contacts and fill the map to use for mapping with function registration
         for(Contact objContact :listOfAllContact){
             mapOfUniqueContactString.put(objContact.CombinedString__c, true); 
+            mapOfUniqueContactStringToUpdate.put(objContact.CombinedString__c, objContact); 
         }
         
         // fetch Lead from sf based on combined String
-        List<Lead> listOfAllLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead
+        List<Lead> listOfAllLead = [SELECT Id, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c FROM Lead
                                     WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
+        Map<String, Lead> mapOfUniqueLeadStringToUpdate = new Map<String, Lead>();
         
         //loop through existing Leads and fill the map to use for mapping with function registration
         for(Lead objLead :listOfAllLead){
             mapOfUniqueLeadString.put(objLead.CombinedString__c, true); 
+            mapOfUniqueLeadStringToUpdate.put(objLead.CombinedString__c, objLead); 
         }
         
         // loop through event's air contact for create Lead/Contact based on Paid/Unpaid function registrations
@@ -538,7 +536,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                     Decimal totalcharge = (Decimal) eventFunregPaymentdetails.get('totalChargeAmount');
                     
                     //create contact and account in salesforce if not exist for paid registartions
-                    if(totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString)) {
+                    if (totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString)) {
                         
                         // contact creation for paid function registrations
                         Contact objcon = new Contact();
@@ -552,13 +550,19 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry') {
+                                    if (FieldName =='Industry INT') {
+                                        objcon.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if (FieldName =='Industry SEC') {
                                         objcon.Industry__c =(String) customFieldsMap.get('value');
                                     }
                                     if(FieldName == 'Company Size'){
                                         objcon.Company_Size__c = (String) customFieldsMap.get('value');
                                     }
-                                    if(FieldName == 'Job Function'){
+                                    if(FieldName == 'Job Function INT'){
+                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function SEC'){
                                         objcon.Job_Function__c = (String) customFieldsMap.get('value');
                                     }
                                 }
@@ -587,6 +591,13 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                             objcon.LastName = strLastName.trim();
                         }     
                         
+                        String strjobTitle = (String) eventConMap.get('jobTitle');
+                        if(strjobTitle == null || strjobTitle == '' ) {
+                            objcon.Title = 'UnKnown';
+                        } else {
+                            objcon.Title = strjobTitle.trim();
+                        }
+
                         //objCon.Events_Air_Contact_Id__c = (String) eventConMap.get('id');
                         String stremail = (String) eventConMap.get('primaryEmail');
                         if(stremail != null && stremail != '') {
@@ -604,7 +615,6 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                             // Assign AccountId to contact Prioirty :- organization name match                       
                             
                             if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
-                                System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccountId.get(orgName));
                                 objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
                             }
                         } else {              
@@ -616,78 +626,176 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                             }  
                         }
                         lstInsrtCon.add(objcon);
-                    } else {
-                        // create lead for unpaid function registration if CombinedString is not found in exiting contact OR in lead
-                        if(!mapOfUniqueLeadString.containsKey(CombinedString)){
-                            
-                            //lead field mapping
-                            Lead newLead = new Lead();
-                            newLead.RecordTypeId = Schema.SObjectType.Lead.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();
-                            String strFirstName = (String) eventConMap.get('firstName');
-                            if (strFirstName != null )  {
-                                if(strFirstName.length() <= 40) {
-                                    newLead.FirstName= strFirstName.trim();
-                                } else {
-                                    newLead.FirstName = strFirstName.substring(0,40).trim();
-                                }
-                            } else {
-                                strFirstName = ''; 
-                            }
-                            
-                            String strLastName = (String) eventConMap.get('lastName');
-                            if(strLastName == null || strLastName == '' ) {
-                                newLead.LastName = 'UnKnown';
-                            } else {
-                                newLead.LastName = strLastName.trim();
-                            }
-                            
-                            //newLead.EventsAir_Contact_Id__c = (String) eventConMap.get('id');
-                            String stremail = (String) eventConMap.get('primaryEmail');
-                            if(stremail != null && stremail != '') {
-                                stremail = stremail.trim();
-                                newLead.Email = stremail;
-                            } else {
-                                newLead.Email = '';
-                            }
-                            
-                            newLead.Event_Category__c = eventCategory;
-                            newLead.Business_Unit__c = 'Divcom';
-                            
-                            if (RecordType != 'Mumbrella') {
-                                List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
-                                
-                                for (Object fields : lsteventsairCustomFields) {
-                                    Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
-                                    String FieldName = (String) customFieldsMap.get('name');
-                                    if (FieldName != '' && FieldName != null) {
-                                        if (FieldName =='Industry') {
-                                            newLead.Industry__c =(String) customFieldsMap.get('value');
-                                        }
-                                        if(FieldName == 'Company Size'){
-                                            newLead.Company_Size__c = (String) customFieldsMap.get('value');
-                                        }
-                                        if(FieldName == 'Job Function'){
-                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                        }
-                                    }
-                                }  
-                            }
-                            Object eventconphone = eventConMap.get('contactPhoneNumbers');
-                            Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone; 
-                            if(eventconphonemap != null) {
-                                newLead.MobilePhone = (String) eventconphonemap.get('mobile'); 
-                            }            
-                            String strOrganization = (String) eventConMap.get('organizationName');
-                            if(strOrganization != null && strOrganization != '') {
-                                newLead.Company = strOrganization;
-                            }
-                            else{
-                                newLead.Company = 'Unknown';
-                            }
-                            newLead.Status = 'New';
-                            lstInsrtLead.add(newLead);
-                            mapOfUniqueLeadString.put(newLead.CombinedString__c , true);
+
+                    } else if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
+                        // update contact for paid function registration
+                        Contact objCon = mapOfUniqueContactStringToUpdate.get(CombinedString);
+
+                        if (objCon.Organization_Name__c == null || objCon.Organization_Name__c == '') {
+                            objCon.Organization_Name__c = (String) eventConMap.get('organizationName');
                         }
+                        if (objCon.Title == null || objCon.Title == '') {
+                            String strjobTitle = (String) eventConMap.get('jobTitle');
+                            if(strjobTitle == null || strjobTitle == '' ) {
+                                objCon.Title = 'UnKnown';
+                            } else {
+                                objCon.Title = strjobTitle.trim();
+                            }
+                        }
+
+                        if (RecordType != 'Mumbrella') {
+                            List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
+                            for (Object fields : lsteventsairCustomFields) {
+                                Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
+                                String FieldName = (String) customFieldsMap.get('name');
+                                if (FieldName != '' && FieldName != null) {
+                                    if (FieldName =='Industry INT' && (objCon.Industry__c == null || objCon.Industry__c == '')) {
+                                        objcon.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if (FieldName =='Industry SEC' && (objCon.Industry__c == null || objCon.Industry__c == '')) {
+                                        objcon.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Company Size' && (objCon.Company_Size__c == null || objCon.Company_Size__c == '')){
+                                        objcon.Company_Size__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function INT' && (objCon.Job_Function__c == null || objCon.Job_Function__c == '')){
+                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function SEC' && (objCon.Job_Function__c == null || objCon.Job_Function__c == '')){
+                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                }
+                            }
+                        }
+
+                        lstupdateCon.add(objCon);
+
+                    } else if (!mapOfUniqueLeadString.containsKey(CombinedString)) {
+                            
+                        //lead field mapping
+                        Lead newLead = new Lead();
+                        newLead.RecordTypeId = Schema.SObjectType.Lead.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();
+                        String strFirstName = (String) eventConMap.get('firstName');
+                        if (strFirstName != null )  {
+                            if(strFirstName.length() <= 40) {
+                                newLead.FirstName= strFirstName.trim();
+                            } else {
+                                newLead.FirstName = strFirstName.substring(0,40).trim();
+                            }
+                        } else {
+                            strFirstName = ''; 
+                        }
+                        
+                        String strLastName = (String) eventConMap.get('lastName');
+                        if(strLastName == null || strLastName == '' ) {
+                            newLead.LastName = 'UnKnown';
+                        } else {
+                            newLead.LastName = strLastName.trim();
+                        }
+                        
+                        String strjobTitle = (String) eventConMap.get('jobTitle');
+                        if(strjobTitle == null || strjobTitle == '' ) {
+                            newLead.Title = 'UnKnown';
+                        } else {
+                            newLead.Title = strjobTitle.trim();
+                        }
+
+                        //newLead.EventsAir_Contact_Id__c = (String) eventConMap.get('id');
+                        String stremail = (String) eventConMap.get('primaryEmail');
+                        if(stremail != null && stremail != '') {
+                            stremail = stremail.trim();
+                            newLead.Email = stremail;
+                        } else {
+                            newLead.Email = '';
+                        }
+                        
+                        newLead.Event_Category__c = eventCategory;
+                        
+                        if (RecordType == 'Mumbrella') {
+                            newLead.Business_Unit__c = 'Mumbrella';
+                        } else {
+                            List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
+                            
+                            for (Object fields : lsteventsairCustomFields) {
+                                Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
+                                String FieldName = (String) customFieldsMap.get('name');
+                                if (FieldName != '' && FieldName != null) {
+                                    if (FieldName =='Industry INT') {
+                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if (FieldName =='Industry SEC') {
+                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Company Size'){
+                                        newLead.Company_Size__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function INT'){
+                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function SEC'){
+                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                }
+                            }  
+                            newLead.Business_Unit__c = 'Divcom';
+
+                        }
+                        Object eventconphone = eventConMap.get('contactPhoneNumbers');
+                        Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone; 
+                        if(eventconphonemap != null) {
+                            newLead.MobilePhone = (String) eventconphonemap.get('mobile'); 
+                        }            
+                        String strOrganization = (String) eventConMap.get('organizationName');
+                        if(strOrganization != null && strOrganization != '') {
+                            newLead.Company = strOrganization;
+                        }
+                        else{
+                            newLead.Company = 'Unknown';
+                        }
+                        newLead.Status = 'New';
+                        lstInsrtLead.add(newLead);
+
+                    } else if (mapOfUniqueLeadStringToUpdate.containsKey(CombinedString)) {
+                        // update lead for unpaid function registration
+                        Lead newLead = mapOfUniqueLeadStringToUpdate.get(CombinedString);
+
+                        if (newLead.Company == null || newLead.Company == '') {
+                            newLead.Company = (String) eventConMap.get('organizationName');
+                        }
+                        if (newLead.Title == null || newLead.Title == '') {
+                            String strjobTitle = (String) eventConMap.get('jobTitle');
+                            if(strjobTitle == null || strjobTitle == '' ) {
+                                newLead.Title = 'UnKnown';
+                            } else {
+                                newLead.Title = strjobTitle.trim();
+                            }
+                        }
+
+                        if (RecordType != 'Mumbrella') {
+                            List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
+                            for (Object fields : lsteventsairCustomFields) {
+                                Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
+                                String FieldName = (String) customFieldsMap.get('name');
+                                if (FieldName != '' && FieldName != null) {
+                                    if (FieldName =='Industry INT' && (newLead.Industry__c == null || newLead.Industry__c == '')) {
+                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if (FieldName =='Industry SEC' && (newLead.Industry__c == null || newLead.Industry__c == '')) {
+                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Company Size' && (newLead.Company_Size__c == null || newLead.Company_Size__c == '')){
+                                        newLead.Company_Size__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function INT' && (newLead.Job_Function__c == null || newLead.Job_Function__c == '')){
+                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function SEC' && (newLead.Job_Function__c == null || newLead.Job_Function__c == '')){
+                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                }
+                            }
+                        }
+                        lstupdateLead.add(newLead);
                     }
                 }
             }
@@ -695,8 +803,8 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         
         
         // Insert Contacts
-        if (!lstInsrtCon.isEmpty()) {            
-            insertContactsIfNotExist(lstInsrtCon, mapOfUniqueContactString);   
+        if (!lstInsrtCon.isEmpty() || !lstUpdateCon.isEmpty()) {            
+            insertContactsIfNotExist(lstInsrtCon, mapOfUniqueContactString, lstUpdateCon);   
             system.debug('insertContactsIfNotExist');
         }
         
@@ -709,8 +817,8 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         }
         
         // Insert Lead
-        if (!lstInsrtLead.isEmpty()) {
-            insertLeadsIfNotExist(lstInsrtLead, mapOfUniqueLeadString); 
+        if (!lstInsrtLead.isEmpty() || !lstUpdateLead.isEmpty()) {
+            insertLeadsIfNotExist(lstInsrtLead, mapOfUniqueLeadString, lstUpdateLead); 
             system.debug('insertLeadsIfNotExist');
         }
         
@@ -730,7 +838,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         // fetch pricebook related to the event Record  
         List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId LIMIT 50000];
         
-        // Loop through event's air contacts data to create function registration
+        // Loop through event's air contacts data to create registration & product & Services
         for(Object objEventCon : lsteventsairContacts) {
             
             Map<String, Object> eventConMap = (Map<String, Object>) objEventCon;  
@@ -757,7 +865,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             if(lsteventsairfunReg != null && lsteventsairfunReg.size() > 0) {
                 
                 List<Object> lsteventsairRecMarket = (List<Object>) eventConMap.get('marketingRecords');
-                // Finalstring is the combination of first name + last name + email
+
                 string Finalstring = getCombinedString(objEventCon);
                 
                 // loop through marketing records to create Product & Services
@@ -794,7 +902,6 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                     lstInsrtProdAndServices.add(prodAndService);
                 }
                 
-                //loop through event'sair function registration data
                 for(Object objEventReg: lsteventsairfunReg) {
                     
                     Map<String, Object> eventReg = (Map<String, Object>)objEventReg;
@@ -862,6 +969,9 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                     } 
                     
                     if(objreg.Registration_Type__c != null) {
+                        System.debug('objreg.Registration_Type__c '+objreg.Registration_Type__c);
+                        System.debug('objreg.Registration_Type__c Containes :-> '+selectedValuesMap.containsKey(objreg.Registration_Type__c.trim()));
+
                         if (selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {                            
                             lstInsrtReg.add(objreg);
                         }
@@ -906,7 +1016,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                         }                       
                         objOpp.Event__c = sfeventId;
                         objOpp.EventsAir_Contact_Id__c = strevntconId;
-                        if(lstPriceook.size()>0){
+                        if(lstPriceook.size()>0) {
                             objOpp.Pricebook2Id =lstPriceook[0].Id;
                         }
                         objOpp.stageName = 'Closed Won'; 
@@ -918,7 +1028,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                 }
             }       
         }
-        
+        System.debug('lstInsrtReg '+lstInsrtReg.size());
         insertProdAndServicesIfNotExist(lstInsrtProdAndServices);
         List<Registration__c> regListForFunctionMapping = insertRegistrationIfNotExist(lstInsrtReg);
         LinkFunctionToRegistration(regListForFunctionMapping);
@@ -970,7 +1080,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
     }  
     
     // Method for insert only new Contacts if not exist in salesforce
-    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Map<String, Boolean> mapOfUniqueContactString) {
+    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Map<String, Boolean> mapOfUniqueContactString , List<Contact> lstUpdateCon) {
         
         List<Contact> FinalListOfContactToInsert = new List<Contact>();
         Set<String> setOfCurrentContactCombinedData = new Set<String>();
@@ -992,12 +1102,36 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         }
         
         if(FinalListOfContactToInsert.size()>0){
-            Database.insert(FinalListOfContactToInsert,false);
-        } 
+            insert FinalListOfContactToInsert;
+        }
+        
+        // update contact
+        List<Contact> FinalListOfContactToUpdate = new List<Contact>();
+        Set<String> setOfCurrentContactCombinedDataForUpdate = new Set<String>();
+
+        //loop through the passed data of contact for update and extract unique contacts for update
+        for(Contact objcontact :lstUpdateCon){
+            String strcombinedEventsAirAttendee = objcontact.FirstName + objcontact.LastName + objcontact.Email; 
+            strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
+            
+            // check if contact is exist or not
+            if(mapOfUniqueContactString.ContainsKey(strcombinedEventsAirAttendee)){
+                // for prevent adding duplicate contact in list
+                if(!setOfCurrentContactCombinedDataForUpdate.contains(strcombinedEventsAirAttendee)){
+                    FinalListOfContactToUpdate.add(objcontact);
+                    setOfCurrentContactCombinedDataForUpdate.add(strcombinedEventsAirAttendee);
+                }
+            }
+        }
+
+        if(FinalListOfContactToUpdate.size()>0){
+            update FinalListOfContactToUpdate;
+        }
+
     }
     
     // Method for insert only new Leads if not exist in salesforce
-    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Map<String, Boolean> mapOfUniqueLeadString) {
+    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Map<String, Boolean> mapOfUniqueLeadString , List<Lead> lstUpdateLead) {
         
         List<Lead> FinalListOfLeadToInsert = new List<Lead>();
         Set<String> setOfCurrentleadCombinedData = new Set<String>();
@@ -1019,6 +1153,28 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         if(FinalListOfLeadToInsert.size()>0){
             insert FinalListOfLeadToInsert;
         } 
+
+        // update lead
+        List<Lead> FinalListOfLeadToUpdate = new List<Lead>();
+        Set<String> setOfCurrentleadCombinedDataForUpdate = new Set<String>();
+
+        for(Lead objLead :lstUpdateLead){
+            String strcombinedEventsAirAttendee= objLead.FirstName+objLead.LastName+objLead.Email; 
+            strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
+            
+            // check if lead exist or not
+            if(mapOfUniqueLeadString.ContainsKey(strcombinedEventsAirAttendee)){
+                // for prevent adding duplicate lead in list
+                if(!setOfCurrentleadCombinedDataForUpdate.contains(strcombinedEventsAirAttendee)){
+                    FinalListOfLeadToUpdate.add(objLead);
+                    setOfCurrentleadCombinedDataForUpdate.add(strcombinedEventsAirAttendee);
+                }
+            }
+        }
+
+        if(FinalListOfLeadToUpdate.size()>0){
+            update FinalListOfLeadToUpdate;
+        }
     }
     
     // Method for insert only new Product_Service_Option if not exist in salesforce
@@ -1116,8 +1272,8 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         }
         
         /*if (listtoUpdatereg.size() > 0) {
-update listtoUpdatereg;
-}*/
+            update listtoUpdatereg;
+        }*/
         return listRegForConnectWithFunction;
     }
     
@@ -1616,8 +1772,14 @@ update listtoUpdatereg;
         //loop through event'sair function registration data for setup function start
         for(Object objEventReg: lstobject) {            
             Map<String, Object> eventReg = (Map<String, Object>)objEventReg;            
-            Map<String, Object> tempfunmap = (Map<String, Object>)(eventReg.get('function'));            
-            listOfFunctioninfomap.add(tempfunmap);            
+            Map<String, Object> tempfunmap = (Map<String, Object>)(eventReg.get('function')); 
+            Map<String, Object> eventregtypemap = (Map<String, Object>) eventReg.get('feeType');
+
+            if(String.isNotBlank(eventData[0].Function_Registration_Types__c) && eventregtypemap.get('name') != null && selectedValuesMap.containsKey((String) eventregtypemap.get('name'))) {          
+                listOfFunctioninfomap.add(tempfunmap);            
+            }else if(String.isBlank(eventData[0].Function_Registration_Types__c)) {
+                listOfFunctioninfomap.add(tempfunmap);
+            }        
         }   
         createFunction(listOfFunctioninfomap);
         
@@ -1705,8 +1867,8 @@ update listtoUpdatereg;
     public void finish(Database.BatchableContext BC) {
         
         if(!test.isrunningtest()) {
-            List<Manage_Eventsair_Fun_Reg_Apex_batch__c> lstcustsett2 = [SELECT Id, Name, Offset__c, Is_Execute_Next__c 
-                                                                         FROM Manage_Eventsair_Fun_Reg_Apex_batch__c LIMIT 1];            
+            List<Manage_EvtAir_Fun_Reg_Sec_And_Inte_Batch__c> lstcustsett2 = [SELECT Id, Name, Offset__c, Is_Execute_Next__c 
+                                                                         FROM Manage_EvtAir_Fun_Reg_Sec_And_Inte_Batch__c LIMIT 1];            
             // Your finish logic goes here
             if(lstcustsett2[0].Is_Execute_Next__c == true) {
                 
@@ -1714,26 +1876,19 @@ update listtoUpdatereg;
                 lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
                 update lstcustsett2;
                 
-                ImportFunRegSeprateSecAndInteBatch newBatch = new ImportFunRegSeprateSecAndInteBatch();
+                ImportFunRegSeprateSecAndInteBatch newBatch = new ImportFunRegSeprateSecAndInteBatch(sfeventId);
                 Database.executeBatch(newBatch, 500);
             }
             else {
                 lstcustsett2[0].Is_Execute_Next__c = true;
                 update lstcustsett2;
                 
-                List<Event__c> updteventlstNextdt = new List<Event__c>();
                 System.debug('### sfeventId  = '+sfeventId);
-                Event__c evnt = new Event__c();
                 if(sfeventId != null){
-                    evnt.Id = sfeventId;
-                    evnt.Next_Date_For_Function_Registration__c = System.today();
-                    updteventlstNextdt.add(evnt);
-                    update updteventlstNextdt;
                 
-                    System.debug('### sfeventId  = '+sfeventId);
                     FeedItem post = new FeedItem();
                     post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                    post.Body = 'Apex batch End for fetching function Registration EventsAir Data';
+                    post.Body = 'Apex batch End for fetching EventsAir Function Registration Data';
                     insert post;   
                 }             
             }
