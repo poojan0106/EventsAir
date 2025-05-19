@@ -22,7 +22,8 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     //fetch current offset value from custom setting
     List<Manage_Eventsair_Sec_And_Int_Reg_batch__c> lstcustsett = [SELECT Id, Name, Offset__c, Is_Execute_Next__c,Generic_Email_Domains__c 
                                                             FROM Manage_Eventsair_Sec_And_Int_Reg_batch__c LIMIT 1];
-
+    public ImportRegSeprateSecAndInteBatch() {
+    }
     public ImportRegSeprateSecAndInteBatch(String strsfeventId ) {        
         this.eventData = [SELECT Id, Name, Open_Date__c, New_Event_Logo__c, Is_Pricebook_Created__c, Registration_Types__c, Event_Category__c, EventsAirID__c, Close_Date__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Id =:strsfeventId AND Registration_Types__c != null
                                    AND EventsAirID__c != null limit 1 ];
@@ -181,27 +182,34 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     }
     
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
-
+		system.debug('responseWrapper-->'+responseWrapper);
         // Serialize the ResponseWrapper to a JSON string
         String serializedResponseWrapper;
         Map<String, Object> jsonResponse;
         Map<String, Object> eventDatamap;
 
         try{   
-            if (String.isNotBlank(eventData[0].Registration_Types__c)) {
-                List<String> selectedValues = eventData[0].Registration_Types__c.split(';');
-                for (String value : selectedValues) {
-                    selectedValuesMap.put(value, value);
+        	System.debug('@@@ eventData = '+eventData);
+                if(eventData.size() > 0) {
+                    if (String.isNotBlank(eventData[0].Registration_Types__c)) {
+                        List<String> selectedValues = eventData[0].Registration_Types__c.split(';');
+                        for (String value : selectedValues) {
+                            selectedValuesMap.put(value, value);
+                        }
+                    }
                 }
-            }
+            
             if (responseWrapper.size() > 0) {
                 serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
                 jsonResponse = (Map<String, Object>) JSON.deserializeUntyped(serializedResponseWrapper);
+                system.debug('jsonResponse-->'+jsonResponse);
             }
+            system.debug('eventDatamap -->'+eventDatamap);
             if (jsonResponse != null) {
                 // Extract the 'data' map from the JSON response
                 if (jsonResponse.containsKey('data') && jsonResponse.get('data') != null) {
                     eventDatamap = (Map<String, Object>) jsonResponse.get('data');
+                    system.debug('eventDatamap inside if-->'+eventDatamap);
                 }
             }     
             Map<String, Object> eventmap;
@@ -286,10 +294,10 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         }catch(Exception e) {
             System.debug('ERROR==>'+ e.getMessage());
             FeedItem post = new FeedItem();
-                    post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                    post.Body = 'Unable to import Registrations For Security And Integrate Seperate \nError: '+e.getMessage();
-                    insert post;    
-        }             
+            post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
+            post.Body = 'Unable to import Registrations For Security And Integrate Seperate \nError: '+e.getMessage();
+            insert post;    
+        }           
     }
     
     public void createRecords(List<Object> lsteventsairContacts) {
@@ -1292,7 +1300,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
             }
         }
         
-        if(finallisttoinsertOpp.size() > 0  && !test.isrunningtest()) {
+        if(finallisttoinsertOpp.size() > 0 ) {
             insert finallisttoinsertOpp;
             allOpportunityList.addAll(finallisttoinsertOpp);
         }

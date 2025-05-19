@@ -208,15 +208,17 @@ public class TempBatchForConLdUpdate implements Database.Batchable<ResponseWrapp
         if(setOfCombinedEventsAirAttendeeFromReg.size()>0){
                
         // fetch Lead from sf based on combined String
-        List<Lead> listOfAllLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead
+        List<Lead> listOfAllLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c,Title FROM Lead
                                     WHERE CombinedString__c in :setOfCombinedEventsAirAttendeeFromReg LIMIT 50000];
         
-        Map<String, Id> mapOfUniqueLeadStringandId = new Map<String, Id>();
-        Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
-        
+            Map<String, Id> mapOfUniqueLeadStringandId = new Map<String, Id>();
+            Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
+            Map<String, String> mapOfUniqueLeadStringandTitle = new Map<String, String>();
+            
         //loop through existing Leads and fill the map to use for mapping with function registration
         for(Lead objLead :listOfAllLead){
             mapOfUniqueLeadStringandId.put(objLead.CombinedString__c, objLead.Id); 
+            mapOfUniqueLeadStringandTitle.put(objLead.CombinedString__c, objLead.Title);
         }
         // loop through event's air contact for create Lead/Contact based on Paid/Unpaid function registrations
         for (Object objEventCon : lsteventsairContacts) {
@@ -230,11 +232,14 @@ public class TempBatchForConLdUpdate implements Database.Batchable<ResponseWrapp
                 newLead.Id = mapOfUniqueLeadStringandId.get(CombinedString);
                 String strPosition = (String) eventConMap.get('jobTitle');
                 
-                if(strPosition != null && strPosition != '' ) {
-                    newLead.Title = strPosition.trim();
-                }else{
-                    newLead.Title = ''; 
-                } 
+                if((mapOfUniqueLeadStringandTitle.get(CombinedString) == null || mapOfUniqueLeadStringandTitle.get(CombinedString) == '')){
+                    if(strPosition != null && strPosition != '' && mapOfUniqueLeadStringandId.containsKey(CombinedString)) {
+                        newLead.Title = strPosition.trim();
+                    }else{
+                        newLead.Title = ''; 
+                    }  
+                }
+                
                 
                 String strOrganization = (String) eventConMap.get('organizationName');
                 if(strOrganization != null && strOrganization != '') {

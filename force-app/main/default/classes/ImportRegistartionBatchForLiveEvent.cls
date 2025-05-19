@@ -621,7 +621,6 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                             }  
                         }
                         lstInsrtCon.add(objcon);
-                        
                     } else {
                         // create lead for unpaid registration if CombinedString is not found in existing contact OR in lead
                         if(!mapOfUniqueLeadString.containsKey(CombinedString)){

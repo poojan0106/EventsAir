@@ -22,14 +22,17 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
     public String RecordType;
 
     //fetch current offset value from custom setting
-    List<ManageEvtAir_FunReg_SecAndInt_Live_Batch__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c,Generic_Email_Domains__c from ManageEvtAir_FunReg_SecAndInt_Live_Batch__c LIMIT 1];
+    List<ManageEvtAir_FunReg_SecAndInt_Live_Batch__c> lstcustsett = [Select Id, Name, Offset__c, Is_Execute_Next__c, Generic_Email_Domains__c from ManageEvtAir_FunReg_SecAndInt_Live_Batch__c LIMIT 1];
     
     public ImportFunRegSeprateSecAndInteLiveBatch() {
         Date todayDate = Date.today();
+        if(Test.isRunningTest()){
+            this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c, New_Event_Logo__c,Registration_Types__c, Function_Registration_Types__c, Is_Pricebook_Created__c, Event_Category__c, Next_Date__c, RecordType.Name FROM Event__c Where Registration_Types__c != null AND Registration_Types__c != ''
+                              and EventsAirID__c != null LIMIT 1];
+        }else{
         this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c,New_Event_Logo__c, Is_Pricebook_Created__c, Next_Date_For_Function_Registration__c, Event_Category__c, RecordType.Name,Function_Registration_Types__c FROM Event__c WHERE Close_Date__c > :todayDate and Function_Registration_Types__c != null and Function_Registration_Types__c != ''
                                    and EventsAirID__c != null and (Next_Date_For_Function_Registration__c = null  OR Next_Date_For_Function_Registration__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
-        
-        System.debug('%%% eventData = '+eventData);
+        }
         for(Event__c evnt: eventData) {
             sfeventId = evnt.Id;
             strEventId = evnt.EventsAirID__c;
@@ -210,11 +213,14 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             Map<String, Object> jsonResponse;
             Map<String, Object> eventDatamap;
 
-            if (String.isNotBlank(eventData[0].Function_Registration_Types__c)) {
-                List<String> selectedValues = eventData[0].Function_Registration_Types__c.split(';');
-                for (String value : selectedValues) {
-                    selectedValuesMap.put(value, value);
-                }
+            if(eventData.size()>0){
+                if (String.isNotBlank(eventData[0].Function_Registration_Types__c)) {
+                    List<String> selectedValues = eventData[0].Function_Registration_Types__c.split(';');
+                    for (String value : selectedValues) {
+                        selectedValuesMap.put(value, value);
+                    }
+                    system.debug('selectedValuesMap---->'+selectedValuesMap);
+                }  
             }
 
             if (responseWrapper.size() > 0) {
@@ -299,6 +305,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             }
             
             if(lsteventsairContacts.size() > 0) {
+                system.debug('lsteventsairContacts----'+lsteventsairContacts);
                 createRecords(lsteventsairContacts); 
             }
             
@@ -484,6 +491,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             }
         }
         
+        system.debug('@@setOfCombinedEventsAirAttendee--'+setOfCombinedEventsAirAttendee);
         // fetch contact from sf based on combined String
         List<Contact> listOfAllContact = [SELECT Id, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c FROM Contact
                                           WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
@@ -495,19 +503,22 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             mapOfUniqueContactString.put(objContact.CombinedString__c, true); 
             mapOfUniqueContactStringToUpdate.put(objContact.CombinedString__c, objContact); 
         }
-        
+        system.debug('@@mapOfUniqueContactString--'+mapOfUniqueContactString);
+        system.debug('@@mapOfUniqueContactStringToUpdate--'+mapOfUniqueContactStringToUpdate);
         // fetch Lead from sf based on combined String
         List<Lead> listOfAllLead = [SELECT Id, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c FROM Lead
                                     WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
         Map<String, Lead> mapOfUniqueLeadStringToUpdate = new Map<String, Lead>();
-        
+        system.debug('@@listOfAllLead--'+listOfAllLead);
         //loop through existing Leads and fill the map to use for mapping with function registration
         for(Lead objLead :listOfAllLead){
             mapOfUniqueLeadString.put(objLead.CombinedString__c, true); 
-            mapOfUniqueLeadStringToUpdate.put(objLead.CombinedString__c, objLead); 
+            mapOfUniqueLeadStringToUpdate.put(objLead.CombinedString__c, objLead);
+            
         }
-        
+        system.debug('@@mapOfUniqueLeadString--'+mapOfUniqueLeadString);
+        system.debug('@@mapOfUniqueLeadStringToUpdate--'+mapOfUniqueLeadStringToUpdate);
         // loop through event's air contact for create Lead/Contact based on Paid/Unpaid function registrations
         for (Object objEventCon : lsteventsairContacts) {
             Map<String, Object> eventConMap = (Map<String, Object>) objEventCon;
@@ -639,7 +650,8 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                         }
                         lstInsrtCon.add(objcon);
 
-                    } else if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
+                    }
+                    else if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
                         // update contact for paid function registration
                         Contact objCon = mapOfUniqueContactStringToUpdate.get(CombinedString);
 
@@ -682,7 +694,8 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
 
                         lstupdateCon.add(objCon);
 
-                    } else if (!mapOfUniqueLeadString.containsKey(CombinedString)) {
+                    } 
+                    else if (!mapOfUniqueLeadString.containsKey(CombinedString)) {
                             
                         //lead field mapping
                         Lead newLead = new Lead();
@@ -767,7 +780,8 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                         newLead.Status = 'New';
                         lstInsrtLead.add(newLead);
 
-                    } else if (mapOfUniqueLeadStringToUpdate.containsKey(CombinedString)) {
+                    }
+                    else if (mapOfUniqueLeadStringToUpdate.containsKey(CombinedString)) {
                         // update lead for unpaid function registration
                         Lead newLead = mapOfUniqueLeadStringToUpdate.get(CombinedString);
 
@@ -922,7 +936,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                     Map<String, Object> eventregPaymentdetails = (Map<String, Object>) eventReg.get('paymentDetails');
                     String strRegDate = (String) eventReg.get('registrationDateTime'); 
                     Decimal totalcharge = (Decimal)eventregPaymentdetails.get('totalChargeAmount');
-                    
+                    system.debug('totalcharge-->'+totalcharge);
                     String strtickets = (String) eventReg.get('tickets');
                     Map<String, Object> tempfunmap = (Map<String, Object>)(eventReg.get('function'));                                
                     String checkInDate = (String) eventReg.get('checkInDate');
@@ -972,9 +986,9 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                     }
 
                     if(eventregtypemap.get('name') != null) {
-                        if(!Test.isRunningTest()) {
+                        //if(!Test.isRunningTest()) {
                             objreg.Registration_Type__c = (String) eventregtypemap.get('name'); 
-                        }
+                        //}
                     }  
 
                     if(eventregPaymentdetails.get('paymentStatus') != null) {
@@ -987,7 +1001,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                         }
                     }
                     // for paid function registration for create opportunity and it's opportunity products
-                    if(totalcharge > 0 ) {   
+                    if(totalcharge > 0 && selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {   
                         // isexecuted = true;
                         system.debug('totalcharge'+totalcharge);
                         String OrganizationName;
@@ -1083,7 +1097,9 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
         }else{
             email = ''; 
         }
-        
+        system.debug('@@fname'+fname);
+         system.debug('@@lname'+lname);
+         system.debug('@@email'+email);
         string Finalstring = fname + lname + email;
         Finalstring = Finalstring.toLowerCase();
         return Finalstring;
@@ -1338,7 +1354,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             }
         }
         
-        if(finallisttoinsertOpp.size() > 0  && !test.isrunningtest()) {
+        if(finallisttoinsertOpp.size() > 0 ) {
             insert finallisttoinsertOpp;
             allOpportunityList.addAll(finallisttoinsertOpp);
         }
@@ -1746,32 +1762,6 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                 update lstupdtReg;
             }
         }
-    }
-    
-    // method to generate  key string(Firstname + Lastname + Email)
-    public static string generatestringMethod(string FName, String LName , String email){
-        
-        string firstName;
-        string lastName;
-        string eemail;
-        string Finalstring;
-        
-        if(FName != null){
-            firstName = FName.trim(); 
-        }
-        
-        if(LName != null){
-            lastName = LName.trim();  
-        }
-        
-        if(email != null){
-            eemail = email.trim();   
-        }
-        
-        Finalstring = firstName + lastName + eemail;
-        
-        return Finalstring;
-        
     }
     
     // helper method for create function

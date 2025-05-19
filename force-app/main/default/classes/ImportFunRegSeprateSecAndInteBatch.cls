@@ -27,6 +27,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
     public ImportFunRegSeprateSecAndInteBatch(String strsfeventId) {
         this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c,New_Event_Logo__c, Is_Pricebook_Created__c, Next_Date_For_Function_Registration__c, Event_Category__c, RecordType.Name,Function_Registration_Types__c FROM Event__c WHERE Id =:strsfeventId AND Function_Registration_Types__c != null AND Function_Registration_Types__c != ''
                                    AND EventsAirID__c != null limit 1 ];
+        system.debug('this.eventData--->'+this.eventData);
         if (eventData != null && eventData.size() > 0) {
             sfeventId = strsfeventId;
             strEventId = eventData[0].EventsAirID__c;
@@ -959,9 +960,9 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                     }
                     
                     if(eventregtypemap.get('name') != null) {
-                        if(!Test.isRunningTest()) {
+                        //if(!Test.isRunningTest()) {
                             objreg.Registration_Type__c = (String) eventregtypemap.get('name'); 
-                        }
+                        //}
                     }  
                     
                     if(eventregPaymentdetails.get('paymentStatus') != null) {
@@ -971,13 +972,13 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                     if(objreg.Registration_Type__c != null) {
                         System.debug('objreg.Registration_Type__c '+objreg.Registration_Type__c);
                         System.debug('objreg.Registration_Type__c Containes :-> '+selectedValuesMap.containsKey(objreg.Registration_Type__c.trim()));
-
+                		System.debug('selectedValuesMap :-> '+selectedValuesMap);
                         if (selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {                            
                             lstInsrtReg.add(objreg);
                         }
                     }
                     // for paid function registration for create opportunity and it's opportunity products
-                    if(totalcharge > 0 ) {   
+                    if(totalcharge > 0 && selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {   
                         // isexecuted = true;
                         system.debug('totalcharge'+totalcharge);
                         String OrganizationName;
@@ -1374,7 +1375,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                     string funregid = (String) eventReg.get('id');
                     
                     // create product based on function registration type
-                    if(eventregtypemap != null && !setOfProdId.contains(strRegTypeId)) {
+                    if(eventregtypemap != null && !setOfProdId.contains(strRegTypeId) && selectedValuesMap.containsKey((String) eventregtypemap.get('name'))) {
                         //Product2 field mapping start
                         Product2 newProduct = new Product2();
                         system.debug('name '+ (String) eventregtypemap.get('name'));
@@ -1456,7 +1457,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                             Map<String, Object> feemap = (Map<String, Object>)objfee;
                             
                             // check for eventsAir strRegTypeId (Product Events Air Id) for prevent duplicate for pricebookEntry
-                            if(mapOfEvnproandSfId.containsKey(strRegTypeId) && !setofProductId.contains(strRegTypeId)) {
+                            if(mapOfEvnproandSfId.containsKey(strRegTypeId) && !setofProductId.contains(strRegTypeId) && selectedValuesMap.containsKey((String) eventregtypemap.get('name'))) {
                                 
                                 //add to standard pricebook
                                 PricebookEntry pbEntry = new PricebookEntry();
@@ -1583,7 +1584,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                     }
                     
                     // check for paid function registration
-                    if(totalcharge > 0){
+                    if(totalcharge > 0 && selectedValuesMap.containsKey((String) eventregtypemap.get('name'))) {
                         
                         system.debug('totalcharge'+totalcharge);
                         //  " mapOfEventConAndSFOppId " check if the contact with eventsAir ID is exist or not in salesforce
@@ -1737,33 +1738,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             }
         }
     }
-    
-    // method to generate  key string(Firstname + Lastname + Email)
-    public static string generatestringMethod(string FName, String LName , String email){
-        
-        string firstName;
-        string lastName;
-        string eemail;
-        string Finalstring;
-        
-        if(FName != null){
-            firstName = FName.trim(); 
-        }
-        
-        if(LName != null){
-            lastName = LName.trim();  
-        }
-        
-        if(email != null){
-            eemail = email.trim();   
-        }
-        
-        Finalstring = firstName + lastName + eemail;
-        
-        return Finalstring;
-        
-    }
-    
+
     // helper method for create function
     public void setupForFunctionReg(List<Object> lstobject) {
         

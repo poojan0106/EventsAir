@@ -1,8 +1,8 @@
 public class ImportFunRegSepSecAndInteBatchscheduler implements schedulable{
-    
+
     public void execute(SchedulableContext sc) {
         
-        ImportFunRegSeprateSecAndInteBatch newBatch = new ImportFunRegSeprateSecAndInteBatch();
+        ImportFunRegSeprateSecAndInteLiveBatch newBatch = new ImportFunRegSeprateSecAndInteLiveBatch();
         Database.executeBatch(newBatch, 500);
     }
 

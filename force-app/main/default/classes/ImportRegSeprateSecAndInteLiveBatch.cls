@@ -25,18 +25,22 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
 
     public ImportRegSeprateSecAndInteLiveBatch () {        
         Date todayDate = Date.today();
-        this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c, New_Event_Logo__c, Is_Pricebook_Created__c, Event_Category__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate AND Registration_Types__c != null AND Registration_Types__c != ''
-                                   and EventsAirID__c != null and (Registration_Types__c = null OR Registration_Types__c = '') and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc LIMIT 1 ];
-        
-        for(Event__c evnt: eventData) {
-            sfeventId = evnt.Id; // set Salesforce Event RecordId value in sfeventId for current EventData
-            strEventId = evnt.EventsAirID__c; // set EventsAir Event RecordId value in strEventId for currentEventData
-            RecordType = evnt.RecordType.Name;  // set current Salesforce Event Record's recordType Name
-
-            if(evnt.Event_Category__c != null){
-                eventCategory = evnt.Event_Category__c; 
+        if(Test.isRunningTest()){
+            this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c, New_Event_Logo__c, Is_Pricebook_Created__c, Event_Category__c, Next_Date__c, Registration_Types__c, RecordType.Name FROM Event__c Where Registration_Types__c != null AND Registration_Types__c != ''
+                              and EventsAirID__c != null LIMIT 1];
+        }else{
+            this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Registration_Types__c, Event_Logo__c, New_Event_Logo__c, Is_Pricebook_Created__c, Event_Category__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate AND Registration_Types__c != null AND Registration_Types__c != ''
+                              and EventsAirID__c != null and (Registration_Types__c != null OR Registration_Types__c != '') and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc LIMIT 1 ];
+        }
+            for(Event__c evnt: eventData) {
+                sfeventId = evnt.Id; // set Salesforce Event RecordId value in sfeventId for current EventData
+                strEventId = evnt.EventsAirID__c; // set EventsAir Event RecordId value in strEventId for currentEventData
+                RecordType = evnt.RecordType.Name;  // set current Salesforce Event Record's recordType Name
+                
+                if(evnt.Event_Category__c != null){
+                    eventCategory = evnt.Event_Category__c; 
+                }
             }
-        }  
     }
     
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
@@ -1004,6 +1008,7 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
         
         insertProdAndServicesIfNotExist(lstInsrtProdAndServices);
         insertRegistrationIfNotExist(lstInsrtReg);
+        system.debug('lstInsrtOpp---'+lstInsrtOpp);
         List<Opportunity> allOpportunitiyList = insertOpportunityIfNotExist(lstInsrtOpp);
         createOpportunityProduct(lsteventsairContacts, allOpportunitiyList); 
     }
@@ -1299,7 +1304,7 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
             }
         }
         
-        if(finallisttoinsertOpp.size() > 0  && !test.isrunningtest()) {
+        if(finallisttoinsertOpp.size() > 0  ) {
             insert finallisttoinsertOpp;
             allOpportunityList.addAll(finallisttoinsertOpp);
         }
@@ -1320,6 +1325,7 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
         List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId LIMIT 50000];
         List<Pricebook2> lstStandardPriceBook = [ SELECT Id FROM Pricebook2 WHERE isStandard = true LIMIT 1];
         
+        system.debug('allOpportunitiyList-->'+allOpportunitiyList);
         for(Opportunity opp: allOpportunitiyList) {
             mapOfEventConAndSFOppId.put(opp.EventsAir_Contact_Id__c, opp.Id);
             system.debug('mapOfEventConAndSFOppId'+mapOfEventConAndSFOppId);
@@ -1557,10 +1563,8 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
                         //  " mapOfEventConAndSFOppId " check if the contact with eventsAir ID is exist or not in salesforce
                         // " mapOfEventRegTypeIdAndSFPBentryId " check if the pricebookentry for the product is created or not in salesforce
                         if( mapOfEventConAndSFOppId.containsKey(strevntconId)  && mapOfEventRegTypeIdAndSFPBentryId.containskey(strRegTypeId)) {
-                            
                             // Finalstring is the combination of first name + last name + email
                             String Finalstring = getCombinedString(objEventCon);
-
                             //OpportunityLineItem field mapping start
                             OpportunityLineItem oli = new OpportunityLineItem();
                             oli.OpportunityId = mapOfEventConAndSFOppId.get(strevntconId);                    
@@ -1692,7 +1696,7 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
 
                     FeedItem post = new FeedItem();
                     post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                    post.Body = 'Apex batch End for fetching EventsAir Registration Data';
+                    post.Body = 'Apex batch End for fetching EventsAir Registration Data  for live event';
                     insert post; 
                 }                               
             }
