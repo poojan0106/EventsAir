@@ -1281,6 +1281,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
     // method to insert new Opportunity(no duplicates) in salesforce
     public List<Opportunity> insertOpportunityIfNotExist(List<Opportunity> lstInsrtOpp) {
         
+        Set<String> setOfprocessedEventsAirContactIds = new Set<String>();
         Map<String, Id> mapOfEvnconIdandSfOppId = new Map<String, Id>();
         set<String> setOfEvnconIds = new set<String>(); // holds eventsAir contact recrod Id
         List<Opportunity> allOpportunityList = new List<Opportunity>();
@@ -1311,21 +1312,22 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             allOpportunityList.addAll(lstexistingOpps);
             for(Opportunity existingOpp: lstexistingOpps) {
                 mapOfEvnconIdandSfOppId.put(existingOpp.EventsAir_Contact_Id__c, existingOpp.Id);
+                setOfprocessedEventsAirContactIds.add(existingOpp.EventsAir_Contact_Id__c);
+
             }
         }
         
         List<Opportunity> finallisttoinsertOpp = new List<Opportunity>();
-        Set<String> oppNames = new Set<String>();
         
         for(Opportunity newopp: lstInsrtOpp) {
-            // add opportunity if opportunity record not found with  eventsAir contact Id in Salesforce AND add new Opportunity Name in set
-            if(!mapOfEvnconIdandSfOppId.containskey(newopp.EventsAir_Contact_Id__c) && !oppNames.contains(newopp.Name)) {
+            // add opportunity if opportunity record not found with  eventsAir contact Id in Salesforce AND add new Opportunity EventsAir_Contact_Id__c in set
+            if(!mapOfEvnconIdandSfOppId.containskey(newopp.EventsAir_Contact_Id__c) && !setOfprocessedEventsAirContactIds.contains(newopp.EventsAir_Contact_Id__c)) {
                 // Assign accountId by finding contact with same EventsAir contact id in map
                 if (( newopp.accountId != null) && mapOfEvtAirContactIdAndAccountId.containsKey(newopp.EventsAir_Contact_Id__c) ) {
                     newopp.accountId = mapOfEvtAirContactIdAndAccountId.get(newopp.EventsAir_Contact_Id__c);
                 } 
                 finallisttoinsertOpp.add(newopp);
-                oppNames.add(newopp.Name);
+                setOfprocessedEventsAirContactIds.add(newopp.EventsAir_Contact_Id__c);
             }
         }
         
@@ -1515,7 +1517,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             }
             List<PricebookEntry> lstexistingPricebookentry = [SELECT Id, Name, Product2.Name, EventsAir_Type_ID__c, UnitPrice
                                                               FROM PricebookEntry 
-                                                              WHERE EventsAir_Type_ID__c IN: setOfPBEntryRegTypeIds LIMIT 50000];
+                                                              WHERE  Pricebook2.isStandard = false AND EventsAir_Type_ID__c IN: setOfPBEntryRegTypeIds LIMIT 50000];
             
             Map<String, Boolean> mapofpricebookentry = new Map<String, Boolean>();
             
@@ -1610,7 +1612,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                             oli.EventsAir_Tax__c = (Decimal) eventregPaymentdetails.get('taxAmount');
                             oli.EventsAir_Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');
                             oli.Function_Registration_Id__c = funregid;
-                            oli.EventsAir_Regisration_ID__c = funregid;
+                            // oli.EventsAir_Regisration_ID__c = funregid;
                             
                             if(Finalstring != null && Finalstring != '') {
                                 
@@ -1638,7 +1640,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         }
         
         //do soql on con to fetch data based on eventsair function registration id
-        List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c, EventsAir_Regisration_ID__c, OpportunityId
+        List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c, OpportunityId
                                                      FROM OpportunityLineItem 
                                                      WHERE Function_Registration_Id__c IN: setOfEvnOLIIds LIMIT 50000];
         

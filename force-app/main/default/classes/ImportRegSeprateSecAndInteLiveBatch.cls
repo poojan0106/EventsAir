@@ -1254,7 +1254,8 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
 
     //Method for insert only new Opportunity if not exist in salesforce
     public List<Opportunity> insertOpportunityIfNotExist(List<Opportunity> lstInsrtOpp) {
-    
+            
+        Set<String> setOfprocessedEventsAirContactIds = new Set<String>();
         Map<String, Id> mapOfEvnconIdandSfOppId = new Map<String, Id>();
         set<String> setOfEvnconIds = new set<String>(); // holds eventsAir contact recrod Id
         List<Opportunity> allOpportunityList = new List<Opportunity>();
@@ -1285,22 +1286,22 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
             allOpportunityList.addAll(lstexistingOpps);
             for(Opportunity existingOpp: lstexistingOpps) {
                 mapOfEvnconIdandSfOppId.put(existingOpp.EventsAir_Contact_Id__c, existingOpp.Id);
+                setOfprocessedEventsAirContactIds.add(existingOpp.EventsAir_Contact_Id__c);
             }
         }
         
         List<Opportunity> finallisttoinsertOpp = new List<Opportunity>();
-        Set<String> oppNames = new Set<String>();
         
         for(Opportunity newopp: lstInsrtOpp) {
-            // add opportunity if opportunity record not found with  eventsAir contact Id in Salesforce AND add new Opportunity Name in set
-            if(!mapOfEvnconIdandSfOppId.containskey(newopp.EventsAir_Contact_Id__c) && !oppNames.contains(newopp.Name)) {
+            // add opportunity if opportunity record not found with  eventsAir contact Id in Salesforce AND add new Opportunity EventsAir_Contact_Id__c in set
+            if(!mapOfEvnconIdandSfOppId.containskey(newopp.EventsAir_Contact_Id__c) && !setOfprocessedEventsAirContactIds.contains(newopp.EventsAir_Contact_Id__c)) {
                 // Assign accountId by finding contact with same EventsAir contact id in map
                 if (( newopp.accountId != null) && mapOfEvtAirContactIdAndAccountId.containsKey(newopp.EventsAir_Contact_Id__c) ) {
                     newopp.accountId = mapOfEvtAirContactIdAndAccountId.get(newopp.EventsAir_Contact_Id__c);
                 } 
 
                 finallisttoinsertOpp.add(newopp);
-                oppNames.add(newopp.Name);
+                setOfprocessedEventsAirContactIds.add(newopp.EventsAir_Contact_Id__c);
             }
         }
         
@@ -1489,7 +1490,7 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
 
             List<PricebookEntry> lstexistingPricebookentry = [SELECT Id, Name, Product2.Name, EventsAir_Type_ID__c, UnitPrice
                                                               FROM PricebookEntry 
-                                                              WHERE EventsAir_Type_ID__c IN: setOfPBEntryRegTypeIds LIMIT 50000];
+                                                              WHERE Pricebook2.isStandard = false AND EventsAir_Type_ID__c IN: setOfPBEntryRegTypeIds LIMIT 50000];
             
             Map<String, Boolean> mapofpricebookentry = new Map<String, Boolean>();
             
@@ -1580,7 +1581,7 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
                             
                             oli.EventsAir_Tax__c = (Decimal) eventregPaymentdetails.get('taxAmount');
                             oli.EventsAir_Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');
-                            oli.Function_Registration_Id__c = registrationId;
+                            // oli.Function_Registration_Id__c = registrationId;
                             oli.EventsAir_Regisration_ID__c = registrationId;
 
                             if(Finalstring != null && Finalstring != '') {
@@ -1605,18 +1606,18 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
         set<String> setOfEvnOLIIds = new set<String>();
         
         for(OpportunityLineItem oli: lstInsertOppProduct) {
-            setOfEvnOLIIds.add(oli.Function_Registration_Id__c);
+            setOfEvnOLIIds.add(oli.EventsAir_Regisration_ID__c);
         }
         
         //do soql on con to fetch data based on eventsair registration id
-        List<OpportunityLineItem> lstexistingOlis = [SELECT Id, Function_Registration_Id__c, EventsAir_Regisration_ID__c, OpportunityId
+        List<OpportunityLineItem> lstexistingOlis = [SELECT Id, EventsAir_Regisration_ID__c, OpportunityId
                                                         FROM OpportunityLineItem 
-                                                        WHERE Function_Registration_Id__c IN: setOfEvnOLIIds LIMIT 50000];
+                                                        WHERE EventsAir_Regisration_ID__c IN: setOfEvnOLIIds LIMIT 50000];
         
         // fill the map of eventsAir Registration Id and SF OpportunityLineItem Id
         if(lstexistingOlis.size() > 0) {
             for(OpportunityLineItem existingoli: lstexistingOlis) {
-                mapOfEvnOLIandSfId.put(existingoli.Function_Registration_Id__c, existingoli.Id);
+                mapOfEvnOLIandSfId.put(existingoli.EventsAir_Regisration_ID__c, existingoli.Id);
             }
         }
 
@@ -1625,7 +1626,7 @@ public class ImportRegSeprateSecAndInteLiveBatch implements Database.Batchable<R
             List<OpportunityLineItem> finallisttoinsertoli= new List<OpportunityLineItem>();
             for(OpportunityLineItem newoli: lstInsertOppProduct) {
                 // check for duplicates and ignor it if found
-                if(!mapOfEvnOLIandSfId.containskey(newoli.Function_Registration_Id__c)) {
+                if(!mapOfEvnOLIandSfId.containskey(newoli.EventsAir_Regisration_ID__c)) {
                     finallisttoinsertoli.add(newoli);
                 }
             }
