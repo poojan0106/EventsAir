@@ -166,6 +166,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         // Send the HTTP request
         HttpResponse response = http.send(request);
         System.debug('@@@@ response = ' + response.getBody());
+        System.debug('@@@@ graphqlQuery = ' + graphqlQuery);
         
         // List to hold the deserialized response
         List<ResponseWrapper> lstofresponseWrapper = new List<ResponseWrapper>();
@@ -304,7 +305,7 @@ try{
             update lstcustsett;
         } 
         }catch(Exception e){
-            System.debug('ERROR==>'+ e.getMessage());
+                System.debug('ERROR==>'+ e.getMessage());
             FeedItem post = new FeedItem();
             post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
             post.Body = 'Unable to import Function Registartions. \nError : '+ e.getMessage();
@@ -1710,8 +1711,8 @@ try{
                 lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
                 update lstcustsett2;
                 
-                ImportFuncRegistartionFromEventsAirBatch newBatch = new ImportFuncRegistartionFromEventsAirBatch(strEventId, sfeventId);
-                Database.executeBatch(newBatch, 500);
+                // ImportFuncRegistartionFromEventsAirBatch newBatch = new ImportFuncRegistartionFromEventsAirBatch(strEventId, sfeventId);
+                // Database.executeBatch(newBatch, 500);
             }
             else {
                 lstcustsett2[0].Is_Execute_Next__c = true;

@@ -36,8 +36,8 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                                    and EventsAirID__c != null and (Registration_Types__c = null OR Registration_Types__c = '') and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
         
         for(Event__c evnt: eventData) {
-            sfeventId = evnt.Id; // set Salesforce Event RecordId value in sfeventId for current EventData
-            strEventId = evnt.EventsAirID__c; // set EventsAir Event RecordId value in strEventId for currentEventData
+            sfeventId = evnt.Id; // // set Salesforce Event RecordId value in sfeventId for current EventData
+            strEventId = evnt.EventsAirID__c;  // set EventsAir Event RecordId value in strEventId for currentEventData
             RecordType = evnt.RecordType.Name;  // set current Salesforce Event Record's recordType Name
         }   
     }
@@ -679,12 +679,26 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                             }
 
                             Object eventconphone = eventConMap.get('contactPhoneNumbers');
-                            Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone;
-
-                            if(eventconphonemap != null) {
-                                newLead.MobilePhone = (String) eventconphonemap.get('mobile'); 
-                            } 
-
+                            if(eventconphone != null){
+                                Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone;
+                                system.debug('check mobilephone characters-->'+(String) eventconphonemap.get('mobile'));
+                                if (eventconphonemap != null && eventconphonemap.containsKey('mobile')) {
+                                    Object phoneObj = eventconphonemap.get('mobile');
+                                    if (phoneObj != null) {
+                                        String phoneStr = String.valueOf(phoneObj);
+                                        if (phoneStr.length() < 40) {
+                                            System.debug('Phone is less than 40 characters: ' + phoneStr);
+                                            newLead.MobilePhone = phoneStr;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                           /* if(eventconphonemap != null && storeMobilePhone.length()<40) {
+                                newLead.MobilePhone = storeMobilePhone;
+                                system.debug('newLead.MobilePhone--->'+newLead.MobilePhone);
+                            } */
+                            
                             String strOrganization = (String) eventConMap.get('organizationName');
                             if(strOrganization != null && strOrganization != '') {
                                 newLead.Company = strOrganization;
@@ -1557,7 +1571,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                 
                     FeedItem post = new FeedItem();
                     post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                    post.Body = 'Apex batch End for fetching EventsAir Registration Data';
+                    post.Body = 'Apex batch End for fetching EventsAir Registration Data for Live Event';
                     insert post;  
                 }   
             }

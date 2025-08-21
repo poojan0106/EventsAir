@@ -23,7 +23,8 @@ public class CSVimportfunctionality{
             String data;
             //Boolean useSpaceForMalformedJoin = true;
             try {
-                data = JSON.deserializeUntyped(base64Data).toString();
+                //data = JSON.deserializeUntyped(base64Data).toString();
+                data = EncodingUtil.base64Decode(base64Data).toString();
             } catch (Exception e) {
                 Database.rollback(sp); 
                 logError('Error decoding base64', e.getMessage(),    e.getLineNumber());
@@ -31,12 +32,11 @@ public class CSVimportfunctionality{
                 return null;
             }
             List<String> lines = data.replaceAll('\r\n', '\n').split('\n');
-            System.debug('lines---->'+JSON.serializePretty(lines));
+            System.debug('lines---->'+JSON.serializePretty(lines)+ ',lines.size()'+lines.size());
             List<String> formattedLines = new List<String>();
-            
+
             String tempLine = '';
             Boolean isMalformed = false;
-            
             for (Integer i = 0; i < lines.size(); i++) {
                 String line = lines[i];
                 if (i == 0) {
@@ -54,14 +54,16 @@ public class CSVimportfunctionality{
                         tempLine = '';
                         isMalformed = false;
                     }
-                    formattedLines.add(line);
+                    else
+                        formattedLines.add(line);
                 }
             }
-            
+
             // Add any remaining malformed data
-            if (tempLine != '') {
+            if (isMalformed && tempLine != '') {
                 formattedLines.add(tempLine);
             }
+
             
             String finaldata = String.join(formattedLines, '\n');
             List<String> csvLines = finaldata.replaceAll('\r\n', '\n').split('\n');
@@ -72,6 +74,7 @@ public class CSVimportfunctionality{
                 }
             }
             csvLines = cleanedCsvLines;
+            
             if (csvLines.isEmpty()) {
                 return 'Error: CSV is empty or contains only blank lines.';
             }
@@ -111,7 +114,6 @@ public class CSVimportfunctionality{
                 return errorMessage;
             }
             
-            
             List<Account> newAccounts = new List<Account>();
             List<Contact> newContacts = new List<Contact>();
             List<Trading_As__c> newTradings = new List<Trading_As__c>();
@@ -125,8 +127,9 @@ public class CSVimportfunctionality{
             Map<String, Account> finalAccountMap = new Map<String, Account>();
             Map<String, Contact> finalContactMap = new Map<String, Contact>();
             Map<String, Trading_As__c> finalTradingMap = new  Map<String, Trading_As__c>();
-            
+            system.debug('csvLines size--->'+csvLines.size());
             for (Integer i = 1; i < csvLines.size(); i++) {
+                
                 String processedLine = replaceCommasInQuotes(csvLines[i]);
                 List<String> rowValues = processedLine.split(',');
                 if (rowValues.isEmpty() || String.isBlank(rowValues[0].trim())) continue;
@@ -136,7 +139,7 @@ public class CSVimportfunctionality{
                     rowValues[headers.indexOf('Last Name')].trim().replace(':comma:', ',').replace('"','');
                 String coExhibitorName = 
                     rowValues[headers.indexOf('Company Name')].trim().replace(':comma:', ',').replace('"','');
-
+				System.debug('FirstName-->'+firstName+ ',  LastName:::'+lastName+', coExhibitorName...'+coExhibitorName);
                 String email = 
                     rowValues[headers.indexOf('Email Address')].trim().replace(':comma:', ',').replace('"','');
                 String customerCoordinator = 
@@ -151,12 +154,13 @@ public class CSVimportfunctionality{
                     }
                 
                 standNames.add(standName);
-                if (accNames.contains(coExhibitorName)) {
+                /*if (accNames.contains(coExhibitorName)) {
+                    system.debug('coExhibitorName--->'+coExhibitorName);
+                    system.debug('accNames--->'+accNames);
                     return 
                         'Error: A duplicate company name was found. Please ensure each company name in the CSV is unique.';
-                }              
-                else
-                    accNames.add(coExhibitorName);
+                }*/              
+                    accNames.add(coExhibitorName.trim());
             }
             
             List<Stand__c> fetchedStands = new List<Stand__c>();
@@ -209,10 +213,12 @@ public class CSVimportfunctionality{
                                WHERE Name IN :accNames];
             
             for (Account acc : fetchedAccounts) {
+                system.debug('acc.Name--->'+acc.Name);
                 String accountKey = acc.Name.toLowerCase();
                 accIds.add(acc.Id);
                 existingAccounts.put(accountKey, acc);
             }
+            system.debug(existingAccounts);
             
             Map<String,Contact> dummyNewContactMap = new Map<String,Contact>();
             Map<String,Trading_As__c> dummyNewTradingAsMap = new Map<String,Trading_As__c>();
@@ -254,10 +260,10 @@ public class CSVimportfunctionality{
                     
                     String tradingAsAssign = '';
                     
-                    if (coExhibitorName.toLowerCase() != tradingAs.toLowerCase()) {
+                    if (coExhibitorName.trim().toLowerCase() != tradingAs.trim().toLowerCase()) {
                         tradingAsAssign = tradingAs;
                     }
-                    String accountKey = (coExhibitorName).toLowerCase();
+                    String accountKey = (coExhibitorName).trim().toLowerCase();
                     Account account;
                     
                     if (existingAccounts.containsKey(accountKey)) {
@@ -282,7 +288,6 @@ public class CSVimportfunctionality{
                         
                         Boolean contactExists = false;
                         Boolean tradingAsExists = false;
-                        System.debug(account.Contacts.size() + '  Contact size');
                         for (Contact con : account.Contacts) {
                             if(con.FirstName != null && con.LastName != null && con.Email != null ){
                                 if (con.FirstName.toLowerCase() == firstName.toLowerCase() && con.LastName.toLowerCase() == lastName.toLowerCase() && con.Email.toLowerCase() == email.toLowerCase()) {
@@ -309,7 +314,7 @@ public class CSVimportfunctionality{
                         }
                         
                         for (Trading_As__c ta : account.Trading_As__r) {
-                            if (ta.Name.toLowerCase() == exhibitingAs.toLowerCase()) {
+                            if (ta.Name.toLowerCase() == exhibitingAs.trim().toLowerCase()) {
                                 tradingAsExists = true;
                                 finalTradingMap.put(account.Id, ta);
                                 break;
@@ -322,9 +327,8 @@ public class CSVimportfunctionality{
                     } 
                     
                     else if(!newcreatedAccounts.containsKey(accountKey)){
-                        System.debug('In else if-->'+accountKey);
                         account = new Account(
-                            Name = coExhibitorName,
+                            Name = coExhibitorName.trim(),
                             BillingCity = city,
                             BillingState = state,
                             BillingCountry = country,
@@ -382,7 +386,7 @@ public class CSVimportfunctionality{
                     for (Account acc : newAccounts) {
                         newAccountIds.add(acc.Id);
                     }
-                    
+                  
                     if (!newAccountIds.isEmpty()) {
                         List<Trading_As__c> newTradingAsTobeInserted = [
                             SELECT Id, Name, Account__c 
@@ -489,7 +493,7 @@ public class CSVimportfunctionality{
                     String standName = 
                         rowValues[headers.indexOf('Stand Number')].trim().replace(':comma:', ',').replace('"','');
                     
-                    Account account = finalAccountMap.get(coExhibitorName.toLowerCase());
+                    Account account = finalAccountMap.get(coExhibitorName.trim().toLowerCase());
                     Stand__c stand = existingStands.get((standName + opportunity.Event__c).toLowerCase());
                     Contact contact = finalContactMap.get((account.Id + firstName + lastName + email).toLowerCase());
                     Trading_As__c tradingas = finalTradingMap.get((account.Id));
@@ -543,6 +547,7 @@ public class CSVimportfunctionality{
                 String original = matcher.group(0); // The full match including quotes
                 String modified = original.replace(',', ':comma:'); // Replace commas inside
                 input = input.replace(original, modified); // Replace in the input string
+                system.debug('input....'+input);
             }
             return input;
         } catch (Exception e) {

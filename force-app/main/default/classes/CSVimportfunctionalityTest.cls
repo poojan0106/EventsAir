@@ -1,6 +1,5 @@
 @isTest
 public class CSVimportfunctionalityTest {
-    
     @testSetup
     static void setupTestData() {
         Event__c event = new Event__c(Name = 'Test Event',Event_Portfolio__c = 'Technology');
@@ -64,12 +63,12 @@ public class CSVimportfunctionalityTest {
     @isTest
     static void testSaveFileSuccess() {
         Opportunity opp = [SELECT Id FROM Opportunity LIMIT 1];
-        String base64Data = JSON.serialize(String.valueOf('\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\nPattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th,Pattaraporn Kongsagoonwong,Test Account,Test Account,,84/3-7 Rama ll Soi 69,Samae Dam,Bang Kung Thain,10150,\"Bangkok,Thailand\",616394255,HT12\r\n,,,,,,,,,,,,,\r\n,,,,,,,,,,,,,\r\n\"'));
+        String base64Data = '\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\nPattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th,Pattaraporn Kongsagoonwong,Test Account,Test Account,,84/3-7 Rama ll Soi 69,Samae Dam,Bang Kung Thain,10150,\"Bangkok,Thailand\",616394255,HT12\r\n,,,,,,,,,,,,,\r\n,,,,,,,,,,,,,\r\n\"';
         /*String base64Data =  '"First Name","Last Name","Email Address","Customer Coordinator","Company Name","Exhibiting As","ABN","Address Line 1","City","State","Postal Code","Country","Work Phone","Stand Number"\n' +
 '"Pattaraporn","Kongsagoonwong","Marketing-admin@royalplus.co.th","Pattaraporn Kongsagoonwong","Royal Plus Public Company Limited","Royal Plus Public Company Limited","","84/3-7 Rama ll Soi 69","Samae Dam","Bang Kung Thain","10150","Bangkok,Thailand","616394255","HT12"\n';*/
-        
+        String base64Encoded = EncodingUtil.base64Encode(Blob.valueOf(base64Data));
         Test.startTest();
-        String result = CSVimportfunctionality.saveFile(base64Data, opp.Id);
+        String result = CSVimportfunctionality.saveFile(base64Encoded, opp.Id);
         Test.stopTest();
         System.assertNotEquals(result, 'Error', 'Expected a successful file processing result.');
     }
@@ -77,19 +76,20 @@ public class CSVimportfunctionalityTest {
     @isTest
     static void testSaveFileSuccess2() {
         Opportunity opp = [SELECT Id FROM Opportunity LIMIT 1];
-        String base64Data =JSON.serialize(String.valueOf('\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\nPattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th,Pattaraporn Kongsagoonwong,Royal Plus Public Company Limited,Royal Plus Public Company Limited,,84/3-7 Rama ll Soi 69,Samae Dam,Bang Kung Thain,10150,\"Bangkok,Thailand\",616394255,HT12\r\n,,,,,,,,,,,,,\r\n,,,,,,,,,,,,,\r\n\"'));
-        
+        String base64Data ='\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\nPattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th,Pattaraporn Kongsagoonwong,Royal Plus Public Company Limited,Royal Plus Public Company Limited,,84/3-7 Rama ll Soi 69,Samae Dam,Bang Kung Thain,10150,\"Bangkok,Thailand\",616394255,HT12\r\n,,,,,,,,,,,,,\r\n,,,,,,,,,,,,,\r\n\"';
+        String base64Encoded = EncodingUtil.base64Encode(Blob.valueOf(base64Data));
         Test.startTest();
-        String result = CSVimportfunctionality.saveFile(base64Data, opp.Id);
+        String result = CSVimportfunctionality.saveFile(base64Encoded, opp.Id);
         Test.stopTest();
         System.assertNotEquals(result, 'Error', 'Expected a successful file processing result.');
     }
     @isTest
     static void testSaveFileMissingHeaders() {
         Opportunity opp = [SELECT Id FROM Opportunity LIMIT 1];
-        String base64Data =JSON.serialize(String.valueOf('\"First Name,Last Name,Email Address\r\nPattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th\r\n,,,,,,,,,,,,,\r\n,,,,,,,,,,,,,\r\n\"'));
+        String base64Data = '\"First Name,Last Name,Email Address\r\nPattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th\r\n,,,,,,,,,,,,,\r\n,,,,,,,,,,,,,\r\n\"';
+        String base64Encoded = EncodingUtil.base64Encode(Blob.valueOf(base64Data));
         Test.startTest();
-        String result = CSVimportfunctionality.saveFile(base64Data, opp.Id);
+        String result = CSVimportfunctionality.saveFile(base64Encoded, opp.Id);
         Test.stopTest();
         //System.assert(result.contains('missing the following required columns'), 'Expected missing headers error.');
     }
@@ -98,29 +98,23 @@ public class CSVimportfunctionalityTest {
         
         
         Opportunity opp = [SELECT Id FROM Opportunity LIMIT 1];
-        String base64Data = JSON.serialize(String.valueOf('\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\nPattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th,Pattaraporn Kongsagoonwong,Test Account,Test Account,,84/3-7 Rama ll Soi 69,Samae Dam,Bang Kung Thain,10150,\"Bangkok,Thailand\",616394255,HT12\r\n,,,,,,,,,,,,,\r\n,,,,,,,,,,,,,\r\n\"'));
-        
+        String base64Data = '\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\nPattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th,Pattaraporn Kongsagoonwong,Test Account,Test Account,,84/3-7 Rama ll Soi 69,Samae Dam,Bang Kung Thain,10150,\"Bangkok,Thailand\",616394255,HT12\r\n,,,,,,,,,,,,,\r\n,,,,,,,,,,,,,\r\n\"';
+        String base64Encoded = EncodingUtil.base64Encode(Blob.valueOf(base64Data));
         Test.startTest();
-        String result = CSVimportfunctionality.saveFile(base64Data, opp.Id);
+        String result = CSVimportfunctionality.saveFile(base64Encoded, opp.Id);
         Test.stopTest();
-        
-        
     }
-    
-    
     
     @isTest
     static void testSaveFileSuccess3() {
         Opportunity opp = [SELECT Id FROM Opportunity LIMIT 1];
-        String base64Data = JSON.serialize(String.valueOf(
-            '\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\n'
+        String base64Data =  '\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\n'
             + 'Pattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th,Pattaraporn Kongsagoonwong,Test Account,Royal Plus Public Company Limited,12365487421,84/3-7 Rama ll Soi 69,Samae Dam,Bang Kung Thain,10150,"Bangkok,Thailand",616394255,Stand1\r\n'
             + ',,,,,,,,,,,,,\r\n' // Empty row (should be skipped)
-            + ',,,,,,,,,,,,,\r\n' // Empty row (should be skipped)
-        ));
-        
+            + ',,,,,,,,,,,,,\r\n';
+        String base64Encoded = EncodingUtil.base64Encode(Blob.valueOf(base64Data));
         Test.startTest();
-        String result = CSVimportfunctionality.saveFile(base64Data, opp.Id);
+        String result = CSVimportfunctionality.saveFile(base64Encoded, opp.Id);
         Test.stopTest();
         
         System.assertNotEquals(result, 'Error', 'Expected a successful file processing result.');
@@ -130,15 +124,13 @@ public class CSVimportfunctionalityTest {
     @isTest
     static void testSaveFileSuccess4() {
         Opportunity opp = [SELECT Id FROM Opportunity LIMIT 1];
-        String base64Data = JSON.serialize(String.valueOf(
-            '\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\n'
+        String base64Data = '\"First Name,Last Name,Email Address,Customer Coordinator,Company Name,Exhibiting As,ABN,Address Line 1,City,State,Postal Code,Country,Work Phone,Stand Number\r\n'
             + 'Pattaraporn,Kongsagoonwong,Marketing-admin@royalplus.co.th,Pattaraporn Kongsagoonwong,Royal Plus Public Company Limited,Royal Plus Public Company Limited,12365487421,84/3-7 Rama ll Soi 69,Samae Dam,Bang Kung Thain,10150,"Bangkok,Thailand",Stand2,Stand1\r\n'
             + ',,,,,,,,,,,,,\r\n' // Empty row (should be skipped)
-            + ',,,,,,,,,,,,,\r\n' // Empty row (should be skipped)
-        ));
-        
+            + ',,,,,,,,,,,,,\r\n';
+        String base64Encoded = EncodingUtil.base64Encode(Blob.valueOf(base64Data));
         Test.startTest();
-        String result = CSVimportfunctionality.saveFile(base64Data, opp.Id);
+        String result = CSVimportfunctionality.saveFile(base64Encoded, opp.Id);
         Test.stopTest();
         
         System.assertNotEquals(result, 'Error', 'Expected a successful file processing result.');
@@ -177,7 +169,4 @@ public class CSVimportfunctionalityTest {
         System.assertEquals('This is a test error message', logs[0].Error_Message__c, 'Error message should match');
         System.assertEquals(10, logs[0].Line_Number__c, 'Line number should match');
     }
-    
-    
-    
 }

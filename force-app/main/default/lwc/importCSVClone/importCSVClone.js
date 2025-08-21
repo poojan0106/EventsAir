@@ -79,7 +79,53 @@ export default class ImportCSVClone extends NavigationMixin(LightningElement) {
 
         this.fileReader.onloadend = () => {
             this.fileContents = this.fileReader.result;
-            let rows = this.fileContents.split(/\r\n|\n/); // Split CSV into rows
+            const rawLines = this.fileContents.split(/\r\n|\n/);
+            console.log('rawLines.length : ',rawLines.length);
+            let rows = [];
+            let currentRow = '';
+            let insideQuotes = false;
+
+            for (let i = 0; i < rawLines.length; i++) {
+                let line = rawLines[i];
+
+                // Count quotes to determine if we're inside a quoted cell
+                const quoteMatches = (line.match(/"/g) || []).length;
+                if (insideQuotes) {
+                    currentRow += '\n' + line;
+                    if (quoteMatches % 2 === 1) {
+                        // Closing quote found
+                        insideQuotes = false;
+                        rows.push(currentRow);
+                        currentRow = '';
+                    }
+                } else {
+                    currentRow = line;
+                    if (quoteMatches % 2 === 1) {
+                        // Starting quote found, possibly multiline
+                        insideQuotes = true;
+                    } else {
+                        rows.push(currentRow);
+                        currentRow = '';
+                    }
+                }
+            }
+
+            // Handle edge case if there's still leftover row
+            if (currentRow.trim() !== '') {
+                rows.push(currentRow);
+            }
+
+            console.log('Total Rows:', rows.length);
+           console.log(',rows---:',rows);
+            if (rows.length > 51) {
+                this.errorMessage = 'Error: CSV file should not have more than 50 rows.';
+                this.fileName = '';
+                this.showLoadingSpinner = false;
+                return;
+            }
+
+            this.processedRows = rows;
+            /*let rows = this.fileContents.split(/\r\n|\n/); // Split CSV into rows
             console.log('Total Rows:', rows);
 
             if (rows.length > 51) {
@@ -87,7 +133,7 @@ export default class ImportCSVClone extends NavigationMixin(LightningElement) {
                 this.fileName = '';
                 this.showLoadingSpinner = false;
                 return;
-            }
+            }*/
             this.processCSV();
         };
 
@@ -97,9 +143,15 @@ export default class ImportCSVClone extends NavigationMixin(LightningElement) {
     processCSV() {
         console.log('OUTPUT : this.opportunityId ======>', this.opportunityId);
         console.log('OUTPUT : fileContents==>', this.fileContents);
+         console.log('JSON.stringify(this.fileContents)', JSON.stringify(this.fileContents));
+        const finalCsv = this.processedRows.join('\n');
+        console.log('finalCsv==>', finalCsv);
+       // const base64Encoded = btoa(finalCsv);
+       const base64Encoded = btoa(new TextEncoder().encode(finalCsv).reduce((data, byte) => data + String.fromCharCode(byte), ''));    //Added 09-07-2025
 
+        console.log('base64Encoded==>', base64Encoded);
         try {
-            saveFile({ base64Data: JSON.stringify(this.fileContents), OpportunityId: this.opportunityId })
+            saveFile({ base64Data: base64Encoded, OpportunityId: this.opportunityId })
                 .then(result => {
                     console.log('OUTPUT : result=> ', result);
                     if (result.startsWith("Error")) {
@@ -111,30 +163,6 @@ export default class ImportCSVClone extends NavigationMixin(LightningElement) {
                         this.fileName = this.fileName + '-' + result;
                         this.errorMessage = '';
                     }
-                    // if (result.startsWith("Error")) {
-                    //     let formattedMessage = result.replace(/\n/g, '<br/>');
-                    //     this.fileName = this.fileName + '-' + formattedMessage;
-                    //     console.log('this.fileName--->', this.fileName);
-
-                    // setTimeout(() => {
-                    //     let errorContainer = this.template.querySelector('.error-message');
-                    //     if (errorContainer) {
-                    //         errorContainer.innerHTML = formattedMessage; // Inject HTML content
-
-                    //     }
-                    // }, 0);
-                    //this.fileName = formattedMessage;
-                    /*this.dispatchEvent(
-                        new ShowToastEvent({
-                            title: 'File Upload Error',
-                            message: formattedMessage,
-                            variant: 'error',
-                            mode: 'sticky'
-                        })
-                    );*/
-                    // } else {
-                    //     this.fileName = this.fileName + '-' + result;
-                    // }
                     this.isTrue = false;
                     this.showLoadingSpinner = false;
                 })

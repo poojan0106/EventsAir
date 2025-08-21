@@ -1280,7 +1280,6 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
     
     // method to insert new Opportunity(no duplicates) in salesforce
     public List<Opportunity> insertOpportunityIfNotExist(List<Opportunity> lstInsrtOpp) {
-        
         Set<String> setOfprocessedEventsAirContactIds = new Set<String>();
         Map<String, Id> mapOfEvnconIdandSfOppId = new Map<String, Id>();
         set<String> setOfEvnconIds = new set<String>(); // holds eventsAir contact recrod Id
