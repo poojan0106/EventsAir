@@ -71,9 +71,14 @@ public class BatchForContactUpdateTest {
         Test.startTest();
         
         ApexPages.StandardController controller = new ApexPages.StandardController(contactList[0]);
+        BatchForContactUpdateController controller1 = new BatchForContactUpdateController(controller);
+        PageReference resultPage = controller1.executeBatch();
         BatchForContactUpdate batch = new BatchForContactUpdate();
-        batch.dumyy();
+       // batch.dumyy();
         Database.executeBatch(batch); // Specify the batch size
+        
+        ForamTestbatch btc = new ForamTestbatch('ewrewrer', 'erwetwer');
+        Database.executeBatch(btc);
         
         Test.stopTest();
 

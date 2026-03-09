@@ -53,7 +53,7 @@ public class LeadTriggerHandler {
 
             if (!primarySegments.isEmpty()) {
                 Map<Id, Relevant_Segment__c> primarySegmentByLeadId = new Map<Id, Relevant_Segment__c>();
-                List<Relevant_Segment__c> primarySegmentsFoCreation = new List<Relevant_Segment__c>();	
+                List<Relevant_Segment__c> primarySegmentsFoCreation = new List<Relevant_Segment__c>();  
 
                 for (Relevant_Segment__c primarySegment : primarySegments) {
                     //FOR MAPPING CODE BLOCK
@@ -109,10 +109,10 @@ public class LeadTriggerHandler {
             }
         }
 
-        if (!mapLeadIdToAccountId.isEmpty()) {
-            queryRelatedRecords(mapLeadIdToAccountId);
-        }
-    }
+if (!mapLeadIdToAccountId.isEmpty()) {
+    // Call asynchronously to avoid overwriting Lightning Lead Convert success link
+    LeadTriggerHandlerAsyncHelper.updateIndustryAndSegmentAsync(mapLeadIdToAccountId);
+}    }
 
     /************************************************************************************************************
     * @description : method to call the methods for querying existing record and update

@@ -32,12 +32,11 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
     public ImportRegistartionBatchForLiveEvent() {        
         Date todayDate = Date.today();
         // fetch event record from salesforce based on conditions
-        this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c, New_Event_Logo__c, Is_Pricebook_Created__c, Event_Category__c, Next_Date__c, RecordType.Name FROM Event__c WHERE Close_Date__c > :todayDate AND Registration_Types__c = null
-                                   and EventsAirID__c != null and (Registration_Types__c = null OR Registration_Types__c = '') and (Next_Date__c = null  OR Next_Date__c < :todayDate) ORDER BY CreatedDate asc limit 1 ];
+        this.eventData = [SELECT Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c, New_Event_Logo__c, Is_Pricebook_Created__c, Event_Category__c, Next_Date__c, RecordType.Name FROM Event__c WHERE id ='a0sAD000001yglNYAQ'];
         
         for(Event__c evnt: eventData) {
-            sfeventId = evnt.Id; // // set Salesforce Event RecordId value in sfeventId for current EventData
-            strEventId = evnt.EventsAirID__c;  // set EventsAir Event RecordId value in strEventId for currentEventData
+            sfeventId = evnt.Id; // set Salesforce Event RecordId value in sfeventId for current EventData
+            strEventId = evnt.EventsAirID__c; // set EventsAir Event RecordId value in strEventId for currentEventData
             RecordType = evnt.RecordType.Name;  // set current Salesforce Event Record's recordType Name
         }   
     }
@@ -176,10 +175,12 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                 responseBody = responseBody.replace('"dateTime"', '"registrationDateTime"');
                 responseBody = responseBody.replace('"date"', '"functiondate"');
                 responseBody = responseBody.replace('"end"', '"functionend"');
-                
+                system.debug('@@responseBody-->'+responseBody);
                 // Deserialize the response into the ResponseWrapper object
                 responseWrapper = (ResponseWrapper) JSON.deserialize(responseBody, ResponseWrapper.class);
+                 system.debug('@@responseWrapper-->'+responseWrapper);
                 lstofresponseWrapper.add(responseWrapper);
+               
             } else {
                 // Update custom settings if the response contains an error
                 if(lstcustsett.size() > 0) {
@@ -339,9 +340,11 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
      
         // Loop through event contacts to process email domain and organization names
         for (Object objEventCon : lsteventsairContacts) {
+            system.debug('objEventCon-->'+objEventCon);
             Map<String, Object> eventConMap = (Map<String, Object>) objEventCon;
             String email = (String) eventConMap.get('primaryEmail');
             String orgName = (String) eventConMap.get('organizationName');
+            system.debug('@@12345orgName-->'+orgName);
             List<Object> lsteventsairReg = (List<Object>) eventConMap.get('registrations');
             String domainName = '';
             Boolean hasPaidRegistration = false;
@@ -399,9 +402,13 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
             if (acc.Domain_Name__c != null) {
                 setOfExistingAccountNameAndDomain.add(acc.Domain_Name__c.toLowerCase());
             }
+             system.debug('@@acc.Domain_Name__c'+acc.Domain_Name__c);
             if (acc.Name != null) {
                 setOfExistingAccountNameAndDomain.add(acc.Name.toLowerCase());
             }
+             system.debug('@@acc.acc.Name'+acc.Name.toLowerCase()+' Size--'+acc.Name.length());
+	                   
+             system.debug('@@setOfExistingAccountNameAndDomain'+setOfExistingAccountNameAndDomain);                   
         }
 
         // Create accounts for paid registartion
@@ -409,9 +416,12 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
         for (String accName : accountNameMap.keySet()) {
             String newDomain = accountNameMap.get(accName);
             if(!setOfGenericDomain.contains(newDomain)) {
+                system.debug('@@newDomain--'+newDomain);
+				system.debug('@@accName--'+accName);
                 if ((!setOfExistingAccountNameAndDomain.contains(newDomain.toLowerCase()) && !setOfExistingAccountNameAndDomain.contains(accName.toLowerCase())) 
                     && paidAccountNames.contains(accName.toLowerCase())) {
                     Account newAccount = new Account();
+                        system.debug('123@@accName--'+accName);
                     newAccount.RecordTypeId = (RecordType == 'Mumbrella') ? 
                         Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId() : 
                         Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Diversified').getRecordTypeId();
@@ -423,6 +433,8 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
             }else {
                 System.debug('Generic Domain Name found in the list :- ' + accName);
                 if (!setOfExistingAccountNameAndDomain.contains(accName.toLowerCase())) {
+                    system.debug('456@@accName--'+accName.toLowerCase());
+					system.debug('456@@accName--'+accName.length());
                     Account newAccount = new Account();
                     newAccount.RecordTypeId = (RecordType == 'Mumbrella') ? 
                         Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId() : 
@@ -439,12 +451,15 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
         // Step 4: Insert new accounts
         if (!listAccPreCreate.isEmpty()) {
             insert listAccPreCreate;
+            lstcustsett[0].Is_Execute_Next__c = false; // Stop batch recursion
+            lstcustsett[0].Offset__c = 0;
+            update lstcustsett;
             System.debug('Accounts Inserted Successfully: ' + listAccPreCreate.size());
         }
         
 
         // if domain not match, check for account name and create map for account name with account Id
-        Map<String, String> MapOfexistingAccountsOrgNameAndAccountId = new Map<String, String>();
+      /*  Map<String, String> MapOfexistingAccountsOrgNameAndAccountId = new Map<String, String>();
         if (setOfOrgNames != null) {
             List<Account> exitingAccListOfOrgNames = [SELECT Id,Name,Domain_Name__c From Account Where Name IN :setOfOrgNames
                                                       AND Account_Status__c != 'Inactive' and On_Hold__c = false LIMIT 50000];
@@ -679,26 +694,12 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                             }
 
                             Object eventconphone = eventConMap.get('contactPhoneNumbers');
-                            if(eventconphone != null){
-                                Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone;
-                                system.debug('check mobilephone characters-->'+(String) eventconphonemap.get('mobile'));
-                                if (eventconphonemap != null && eventconphonemap.containsKey('mobile')) {
-                                    Object phoneObj = eventconphonemap.get('mobile');
-                                    if (phoneObj != null) {
-                                        String phoneStr = String.valueOf(phoneObj);
-                                        if (phoneStr.length() < 40) {
-                                            System.debug('Phone is less than 40 characters: ' + phoneStr);
-                                            newLead.MobilePhone = phoneStr;
-                                        }
-                                    }
-                                }
-                            }
-                            
-                           /* if(eventconphonemap != null && storeMobilePhone.length()<40) {
-                                newLead.MobilePhone = storeMobilePhone;
-                                system.debug('newLead.MobilePhone--->'+newLead.MobilePhone);
-                            } */
-                            
+                            Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone;
+
+                            if(eventconphonemap != null) {
+                                newLead.MobilePhone = (String) eventconphonemap.get('mobile'); 
+                            } 
+
                             String strOrganization = (String) eventConMap.get('organizationName');
                             if(strOrganization != null && strOrganization != '') {
                                 newLead.Company = strOrganization;
@@ -746,7 +747,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
 
         List<Registration__c> lstInsrtReg = new List<Registration__c>(); 
         List<Opportunity> lstInsrtOpp = new List<Opportunity>();
-
+		Map<String,String> mapOfEventsairRegIdandCheckidDate = new Map<String,String>();
         // fetch pricebook related to the event Record
         List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId LIMIT 50000];
         
@@ -836,7 +837,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                     if (checkInDate != null) {
                         objreg.CheckInDate__c = (Datetime) JSON.deserialize('"' + checkInDate + '"', Datetime.class);     
                     }
-
+					mapOfEventsairRegIdandCheckidDate.put((string)eventReg.get('id'),checkInDate);
                     if (checkOutDate != null) {
                         objreg.CheckOutDate__c	 = (Datetime) JSON.deserialize('"' + checkOutDate + '"', Datetime.class);  
                     }
@@ -925,9 +926,9 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
         }
 
         insertProdAndServicesIfNotExist(lstInsrtProdAndServices);
-        insertRegistrationIfNotExist(lstInsrtReg);
+        insertRegistrationIfNotExist(lstInsrtReg,mapOfEventsairRegIdandCheckidDate);
         List<Opportunity> allOpportunitiyList = insertOpportunityIfNotExist(lstInsrtOpp);
-        createOpportunityProduct(lsteventsairContacts, allOpportunitiyList);        
+        createOpportunityProduct(lsteventsairContacts, allOpportunitiyList); */       
     }
     
     // Method for create combined String
@@ -1076,9 +1077,10 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
     }
 
     // Method for insert only new Registration if not exist in salesforce
-    public void insertRegistrationIfNotExist(List<Registration__c> lstInsrtReg) {
+    public void insertRegistrationIfNotExist(List<Registration__c> lstInsrtReg,Map<String,String> mapOfEventsairRegIdandCheckidDate) {
         
         Map<String, Id> mapOfEvnRegIdandSfRegId = new Map<String, Id>();
+        Map<String, Datetime> mapOfExistingEvnRegIdandCheckinDate = new Map<String, Datetime>();
         set<String> setOfEvnRegIds = new set<String>(); // holds eventsAir registration record Id
         
         for(Registration__c reg: lstInsrtReg) {
@@ -1086,7 +1088,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
         }
         
         //do soql on registartion to fetch data based on eventsair registration id
-        List<Registration__c> lstexistingRegistrations = [SELECT Id, EventsAir_Regisration_ID__c
+        List<Registration__c> lstexistingRegistrations = [SELECT Id, EventsAir_Regisration_ID__c,CheckInDate__c
                                                           FROM Registration__c 
                                                           WHERE EventsAir_Regisration_ID__c IN: setOfEvnRegIds and Event__c =:sfeventId LIMIT 50000];
         system.debug('lstexistingRegistrations'+lstexistingRegistrations.size());
@@ -1096,11 +1098,13 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
         if(lstexistingRegistrations.size() > 0) {
             for(Registration__c existingreg: lstexistingRegistrations) {
                 mapOfEvnRegIdandSfRegId.put(existingreg.EventsAir_Regisration_ID__c, existingreg.Id);
+                mapOfExistingEvnRegIdandCheckinDate.put(existingreg.EventsAir_Regisration_ID__c,existingreg.CheckInDate__c);
+  
             }
         }
         
         List<Registration__c> finallisttoinsertreg = new List<Registration__c>();
-        // List<Registration__c> listtoUpdatereg = new List<Registration__c>();
+        List<Registration__c> listtoUpdatereg = new List<Registration__c>();
         
         for(Registration__c newreg: lstInsrtReg) {
             // check if exiting registration record if not found than add for insert
@@ -1111,15 +1115,37 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                 newreg.Id = mapOfEvnRegIdandSfRegId.get(newreg.EventsAir_Regisration_ID__c);
                 listtoUpdatereg.add(newreg);
             }*/
+                if(mapOfExistingEvnRegIdandCheckinDate.containskey(newreg.EventsAir_Regisration_ID__c)){
+                
+                if(mapOfExistingEvnRegIdandCheckinDate.get(newreg.EventsAir_Regisration_ID__c) == null){
+                    if(mapOfEventsairRegIdandCheckidDate.containskey(newreg.EventsAir_Regisration_ID__c)){
+                        if(mapOfEventsairRegIdandCheckidDate.get(newreg.EventsAir_Regisration_ID__c) != null ||
+                           mapOfEventsairRegIdandCheckidDate.get(newreg.EventsAir_Regisration_ID__c) !=''){
+                               
+                               Registration__c regtoUpdt = new Registration__c();
+                               if(mapOfEvnRegIdandSfRegId.containskey(newreg.EventsAir_Regisration_ID__c) && mapOfEvnRegIdandSfRegId.get(newreg.EventsAir_Regisration_ID__c) != null ){
+                                   regtoUpdt.id = mapOfEvnRegIdandSfRegId.get(newreg.EventsAir_Regisration_ID__c);
+                               }
+                               string checkInDate =mapOfEventsairRegIdandCheckidDate.get(newreg.EventsAir_Regisration_ID__c);
+                               if(checkInDate != null){
+                                   regtoUpdt.CheckInDate__c = (Datetime) JSON.deserialize('"' + checkInDate + '"', Datetime.class); 
+                               }
+                               listtoUpdatereg.add(regtoUpdt);
+                           }
+                    }
+                    
+                }
+            }
+        
         }
 
         if(finallisttoinsertreg.size() >0) {
             insert finallisttoinsertreg ;
         }
 
-        /*if (listtoUpdatereg.size() > 0) {
-           // update listtoUpdatereg;
-        }*/
+        if (listtoUpdatereg.size() > 0) {
+            update listtoUpdatereg;
+        }
     }
 
     // method to insert new Opportunity(no duplicates) in salesforce
@@ -1571,7 +1597,7 @@ public class ImportRegistartionBatchForLiveEvent implements Database.Batchable<R
                 
                     FeedItem post = new FeedItem();
                     post.ParentId = sfeventId; //eg. Opportunity id, custom object id..
-                    post.Body = 'Apex batch End for fetching EventsAir Registration Data for Live Event';
+                    post.Body = 'Apex batch End for fetching EventsAir Registration Data';
                     insert post;  
                 }   
             }

@@ -290,7 +290,8 @@ public with sharing class OpportunityTriggerHandler {
         for (Opportunity newOpp : oppList) {
             if (newOpp.Rebooked__c == true && 
                 newMap.get(newOpp.Id).Rebooked__c != oldMap.get(newOpp.Id).Rebooked__c && 
-                newOpp.StageName == Label.Opportunity_Stage_Closed_Won) {
+               (newOpp.StageName == Label.Opportunity_Stage_Closed_Won || 
+     newOpp.StageName == Label.Opportunity_Stage_Closed_Lost))  {
 
                 opportunityWrapper.qualifiedOppIds.add(newOpp.Id);
                 opportunityWrapper.qualifiedOppMap.put(newOpp.Id, newOpp);

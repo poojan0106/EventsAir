@@ -835,7 +835,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         
         List<Registration__c> lstInsrtReg = new List<Registration__c>(); 
         List<Opportunity> lstInsrtOpp = new List<Opportunity>();
-        
+        Map<String,String> mapOfEventsairRegIdandCheckidDate = new Map<String,String>();
         // fetch pricebook related to the event Record  
         List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId LIMIT 50000];
         
@@ -933,6 +933,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                     if(checkInDate != null) {
                         objreg.CheckInDate__c = (Datetime) JSON.deserialize('"' + checkInDate + '"', Datetime.class);                  
                     }
+                    mapOfEventsairRegIdandCheckidDate.put((string)eventReg.get('id'),checkInDate);
                     
                     if(checkOutDate != null) {
                         objreg.CheckOutDate__c  = (Datetime) JSON.deserialize('"' + checkOutDate + '"', Datetime.class);                     
@@ -1031,7 +1032,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         }
         System.debug('lstInsrtReg '+lstInsrtReg.size());
         insertProdAndServicesIfNotExist(lstInsrtProdAndServices);
-        List<Registration__c> regListForFunctionMapping = insertRegistrationIfNotExist(lstInsrtReg);
+        List<Registration__c> regListForFunctionMapping = insertRegistrationIfNotExist(lstInsrtReg,mapOfEventsairRegIdandCheckidDate);
         LinkFunctionToRegistration(regListForFunctionMapping);
         List<Opportunity> allOpportunitiyList = insertOpportunityIfNotExist(lstInsrtOpp);
         createOpportunityProduct(lsteventsairContacts, allOpportunitiyList);
@@ -1229,9 +1230,10 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
     }   
     
     // Method for insert only new function registration if not exist in salesforce
-    public List<Registration__c> insertRegistrationIfNotExist(List<Registration__c> lstInsrtReg) {
+    public List<Registration__c> insertRegistrationIfNotExist(List<Registration__c> lstInsrtReg,Map<String,String> mapOfEventsairRegIdandCheckidDate) {
         
         Map<String, Id> mapOfEvnRegIdandSfRegId = new Map<String, Id>();
+        Map<String, Datetime> mapOfExistingEvnRegIdandCheckinDate = new Map<String, Datetime>();
         set<String> setOfEvnRegIds = new set<String>(); // holds eventsAir function registration record Id
         
         for(Registration__c reg: lstInsrtReg) {
@@ -1239,7 +1241,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         }
         
         //do soql on registartion to fetch data based on eventsair function registration id
-        List<Registration__c> lstexistingRegistrations = [SELECT Id, EventsAir_Regisration_ID__c
+        List<Registration__c> lstexistingRegistrations = [SELECT Id, EventsAir_Regisration_ID__c,CheckInDate__c
                                                           FROM Registration__c 
                                                           WHERE EventsAir_Regisration_ID__c IN: setOfEvnRegIds and Event__c =:sfeventId LIMIT 50000];
         system.debug('lstexistingRegistrations'+lstexistingRegistrations.size());
@@ -1249,11 +1251,12 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         if(lstexistingRegistrations.size() > 0) {
             for(Registration__c existingreg: lstexistingRegistrations) {
                 mapOfEvnRegIdandSfRegId.put(existingreg.EventsAir_Regisration_ID__c, existingreg.Id);
+                mapOfExistingEvnRegIdandCheckinDate.put(existingreg.EventsAir_Regisration_ID__c,existingreg.CheckInDate__c);
             }
         }
         
         List<Registration__c> finallisttoinsertreg = new List<Registration__c>();
-        // List<Registration__c> listtoUpdatereg = new List<Registration__c>();
+         List<Registration__c> listtoUpdatereg = new List<Registration__c>();
         List<Registration__c> listRegForConnectWithFunction = new List<Registration__c>();
         
         for(Registration__c newreg: lstInsrtReg) {
@@ -1265,6 +1268,28 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                 // listtoUpdatereg.add(newreg);
                 listRegForConnectWithFunction.add(newreg);
             }
+			     if(mapOfExistingEvnRegIdandCheckinDate.containskey(newreg.EventsAir_Regisration_ID__c)){
+                
+                if(mapOfExistingEvnRegIdandCheckinDate.get(newreg.EventsAir_Regisration_ID__c) == null){
+                    if(mapOfEventsairRegIdandCheckidDate.containskey(newreg.EventsAir_Regisration_ID__c)){
+                        if(mapOfEventsairRegIdandCheckidDate.get(newreg.EventsAir_Regisration_ID__c) != null ||
+                           mapOfEventsairRegIdandCheckidDate.get(newreg.EventsAir_Regisration_ID__c) !=''){
+                               
+                               Registration__c regtoUpdt = new Registration__c();
+                               if(mapOfEvnRegIdandSfRegId.containskey(newreg.EventsAir_Regisration_ID__c) && mapOfEvnRegIdandSfRegId.get(newreg.EventsAir_Regisration_ID__c) != null ){
+                                   regtoUpdt.id = mapOfEvnRegIdandSfRegId.get(newreg.EventsAir_Regisration_ID__c);
+                               }
+                               string checkInDate =mapOfEventsairRegIdandCheckidDate.get(newreg.EventsAir_Regisration_ID__c);
+                               if(checkInDate != null){
+                                   regtoUpdt.CheckInDate__c = (Datetime) JSON.deserialize('"' + checkInDate + '"', Datetime.class); 
+                               }
+                               listtoUpdatereg.add(regtoUpdt);
+                           }
+                    }
+                    
+                }
+            }
+       
         }
         
         if(finallisttoinsertreg.size() >0) {
@@ -1272,9 +1297,9 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             listRegForConnectWithFunction.addAll(finallisttoinsertreg);
         }
         
-        /*if (listtoUpdatereg.size() > 0) {
+        if (listtoUpdatereg.size() > 0) {
             update listtoUpdatereg;
-        }*/
+        }
         return listRegForConnectWithFunction;
     }
     

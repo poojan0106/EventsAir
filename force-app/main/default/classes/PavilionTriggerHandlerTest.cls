@@ -34,11 +34,11 @@ public class PavilionTriggerHandlerTest {
         insert newPricebookEntry2;
         System.assert(newPricebookEntry2 != null);
 
-        Account newAccount = TestDataFactory.createDifferentAccount('Contractor');
+        Account newAccount = TestDataFactory.createDifferentAccount('Contractor' , '12345678910');
         insert newAccount;
         System.assert(newAccount != null);
 
-        Account venueAccount = TestDataFactory.createDifferentAccount('Venue');
+        Account venueAccount = TestDataFactory.createDifferentAccount('Venue' , '98765432111');
         venueAccount.Name = 'test Venue';
         insert venueAccount;
         System.assert(venueAccount != null);
@@ -74,6 +74,7 @@ public class PavilionTriggerHandlerTest {
         currentEvent.X1_Payment_Term__c = paymentTerm1.Id;
         currentEvent.X2_Payment_Term__c = paymentTerm2.Id;
         currentEvent.X3_Payment_Term__c = paymentTerm3.Id;
+        currentEvent.Event_Manager__c = UserInfo.getUserId();
         insert currentEvent;
         System.assert(currentEvent != null);
 

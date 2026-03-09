@@ -33,7 +33,7 @@ public class ImportRegistartionForAllEventsBatch implements Database.Batchable<R
         System.debug('@@@ lstcustsett = '+lstcustsett);
         
         //get access token
-        String strtoken = EventsAirOAuthTokenRequest.getAccessToken();
+        String strtoken = EventsAirOAuthTokenRequest.getAccessToken('test');
         
         //Prepare API Query        
         String graphqlQuery = '{' +
