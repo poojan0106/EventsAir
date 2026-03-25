@@ -31,6 +31,7 @@ public class ResponseWrapper {
         List<CustomField> customFields;
         List<EventMarketingRecord> marketingRecords;
         Datetime lastModifiedAt;
+        public String workPhone;
     }
     
     public class CustomField {

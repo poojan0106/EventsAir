@@ -81,6 +81,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
             'checkInDate,' +
             'checkOutDate,' +
             'primaryEmail,' +
+            'workPhone,' +
             'primaryAddress {' +
             'city,' + 
             'country,' + 
@@ -598,14 +599,15 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                             stremail = stremail.trim();
                             objcon.Email = stremail;
                         } else {
-                            objcon.Email = ''; 
+                            objcon.Email = '';
                         }
-                        
-                        Object eventconphone = eventConMap.get('contactPhoneNumbers');
-                        Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone;
-                        if(eventconphonemap != null) {
-                            objcon.MobilePhone = (String) eventconphonemap.get('mobile');
-                        } 
+
+                        String strWorkPhone = (String) eventConMap.get('workPhone');
+                        if(strWorkPhone != null && strWorkPhone != '') {
+                            strWorkPhone = strWorkPhone.trim();
+                            objcon.MobilePhone = strWorkPhone;
+                            objcon.Phone = strWorkPhone;
+                        }
                         
                         if(setOfGenericDomain.contains(strAccdomainname)) {
                             // Assign AccountId to contact Prioirty :- organization name match                       
@@ -705,7 +707,14 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                         } else {
                             newLead.Email = '';
                         }
-                        
+
+                        String strWorkPhone = (String) eventConMap.get('workPhone');
+                        if(strWorkPhone != null && strWorkPhone != '') {
+                            strWorkPhone = strWorkPhone.trim();
+                            newLead.MobilePhone = strWorkPhone;
+                            newLead.Phone = strWorkPhone;
+                        }
+
                         newLead.Event_Category__c = eventCategory;
                         
                         if (RecordType == 'Mumbrella') {
@@ -737,13 +746,6 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                             newLead.Business_Unit__c = 'Divcom';
                             
                         }
-                        
-                        Object eventconphone = eventConMap.get('contactPhoneNumbers');
-                        Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone;
-                        
-                        if(eventconphonemap != null) {
-                            newLead.MobilePhone = (String) eventconphonemap.get('mobile'); 
-                        } 
                         
                         String strOrganization = (String) eventConMap.get('organizationName');
                         if(strOrganization != null && strOrganization != '') {

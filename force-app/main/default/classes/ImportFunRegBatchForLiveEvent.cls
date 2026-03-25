@@ -83,6 +83,7 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
             'checkInDate,' +
             'checkOutDate,' +
             'primaryEmail,' +
+            'workPhone,' +
             'primaryAddress {' +
             'city,' + 
             'country,' + 
@@ -595,13 +596,15 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
                             stremail = stremail.trim();
                             objcon.Email = stremail;
                         } else {
-                            objcon.Email = ''; 
-                        }    
-                        Object eventconphone = eventConMap.get('contactPhoneNumbers');
-                        Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone;
-                        if(eventconphonemap != null) {
-                            objcon.MobilePhone = (String) eventconphonemap.get('mobile');
-                        } 
+                            objcon.Email = '';
+                        }
+
+                        String strWorkPhone = (String) eventConMap.get('workPhone');
+                        if(strWorkPhone != null && strWorkPhone != '') {
+                            strWorkPhone = strWorkPhone.trim();
+                            objcon.MobilePhone = strWorkPhone;
+                            objcon.Phone = strWorkPhone;
+                        }
                                         
                         if(setOfGenericDomain.contains(strAccdomainname)) {
                             // Assign AccountId to contact Prioirty :- organization name match                       
@@ -653,6 +656,13 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
                                 newLead.Email = '';
                             }
 
+                            String strWorkPhone = (String) eventConMap.get('workPhone');
+                            if(strWorkPhone != null && strWorkPhone != '') {
+                                strWorkPhone = strWorkPhone.trim();
+                                newLead.MobilePhone = strWorkPhone;
+                                newLead.Phone = strWorkPhone;
+                            }
+
                             newLead.Event_Category__c = eventCategory;
                             newLead.Business_Unit__c = 'Divcom';
 
@@ -675,11 +685,7 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
                                     }
                                 }  
                             }
-                            Object eventconphone = eventConMap.get('contactPhoneNumbers');
-                            Map<String, Object> eventconphonemap = (Map<String, Object>) eventconphone; 
-                            if(eventconphonemap != null) {
-                                newLead.MobilePhone = (String) eventconphonemap.get('mobile'); 
-                            }            
+           
                             String strOrganization = (String) eventConMap.get('organizationName');
                             if(strOrganization != null && strOrganization != '') {
                                 newLead.Company = strOrganization;

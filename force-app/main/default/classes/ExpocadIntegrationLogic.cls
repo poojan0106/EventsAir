@@ -6,15 +6,9 @@ Description:- Logic of all calloouts are mentioned in this class
 public  class ExpocadIntegrationLogic {
    
     public static Boolean updateFromExpocad=false;
-
-
     private static Event__c fetchEvent(String eventId) {
         return [SELECT Id,ExpoCAD_ID__c,Details_Synced_with_ExpoCAD__c, Last_Synced_with_ExpoCAD__c, Name FROM Event__c WHERE Id=:eventId LIMIT 1];
     }
-
-    // private static Stand__c fetchStandRecord(String standId) {
-    //     return [SELECT Id, Is_On_Hold__c, Is_Rented__c, Currently_Holding_Opportunity__r.Space_Type__c ,Currently_Holding_Opportunity__r.AccountId , Account_ID__c, Trading_As__c, Account_Name__c, Event_Expocad_Id__c, Event__c, Name FROM Stand__c WHERE Id=:standId LIMIT 1];
-    // }
 
     private static Co_Exhibitor__c fetchCoExhibitors(String coExhibitorId) {
         return [SELECT Id, Name , Stand__c , Exhibitor_Sync_with_ExpoCAD__c, Details_Synced_with_ExpoCAD__c, Stand__r.Name, Event__c , Event__r.Name ,Event__r.ExpoCAD_ID__c ,  Account__c	, Account__r.Name From Co_Exhibitor__c WHERE Id=:coExhibitorId LIMIT 1];
@@ -24,8 +18,9 @@ public  class ExpocadIntegrationLogic {
     @future (callout=true)
     public static void pavilionExpocadCallout(String eventId){
         Event__c eventRecord = fetchEvent(eventId);
+        String eventExpocadId=eventRecord.ExpoCAD_ID__c.toLowerCase();
         try{
-            ExpocadWrapper expoWrap= ExpocadIntegration.getPavilionsByEvent(eventRecord.ExpoCAD_ID__c);
+            ExpocadWrapper expoWrap= ExpocadIntegration.getPavilionsByEvent(eventExpocadId);
             if(expoWrap.success){
                 List<String> pavilionNamesList= new List<String>();
                 for (ExpocadWrapper.PavilionNames pavilion : (List<ExpocadWrapper.PavilionNames>) JSON.deserialize(expoWrap.message, List<ExpocadWrapper.PavilionNames>.class)) {
@@ -33,59 +28,74 @@ public  class ExpocadIntegrationLogic {
                 }
                 addStandRecords(eventRecord  , pavilionNamesList);
             }else{
-                eventRecord.Details_Synced_with_ExpoCAD__c='Failure';
-                eventRecord.Event_ExpoCAD_Error_Details__c=expoWrap.message;
-                updateFromExpocad=true;
-                update eventRecord;
+                updateEventWithError(eventRecord, expoWrap.message);
                 System.debug('Integration Error');
                 handleIntegrationException(expoWrap.message);
             }
         }catch(Exception exp){
-            eventRecord.Details_Synced_with_ExpoCAD__c='Failure';
-            eventRecord.Event_ExpoCAD_Error_Details__c='Exception:' + exp.getMessage() + exp.getLineNumber();
-            updateFromExpocad=true;
-            update eventRecord;
+            updateEventWithError(eventRecord, 'Exception:' + exp.getMessage() + exp.getLineNumber());
             System.debug('pavilionExpocad Exception:' + exp.getMessage() + exp.getLineNumber());
             handleException(exp);
         }
     }
     // Description:Get booths from expocad and display it in salesforce.
     public static void addStandRecords(Event__c eventRecord, List<String> pavilionNamesList){
-        ExpocadWrapper expoWrap= ExpocadIntegration.getBoothByEvent(eventRecord.ExpoCAD_ID__c);
-        ExpocadWrapper expoWrapDeletedBooth= ExpocadIntegration.getDeletedBoothByEvent(eventRecord.ExpoCAD_ID__c);
+        String eventExpocadId=eventRecord.ExpoCAD_ID__c.toLowerCase();
+        ExpocadWrapper expoWrap= ExpocadIntegration.getBoothByEvent(eventExpocadId);
         try{
             // collection to store the records...
             List<Stand__c> standList= new List<Stand__c>();
             Map<String, Pavilion__c> pavilionMap= new Map<String, Pavilion__c>();
             Map<String, Stand__c> standMap= new Map<String, Stand__c>();
             Set<String> exhibitorSet= new Set<String>();
+            Set<String> expocadIdsSet= new Set<String>();
+            Set<String> pavilionExpoCADIds = new Set<String>();
+            Map<String, Pavilion__c> existingPavilionsMap = new Map<String, Pavilion__c>();
+            List<Stand__c> recordsToAdd = new List<Stand__c>();
+            Map<String, Stand__c> existingStandMap = new Map<String, Stand__c>();
+            Map<String, Stand__c> recordsToAddMap = new Map<String, Stand__c>();
+
 
             // Upsert Pavilions Data..
             if(pavilionNamesList.size() > 0){
                 List<Pavilion__c> pavilionList= new List<Pavilion__c>();
+                Map<String,Pavilion__c> pavRecordsToAdd = new Map<String,Pavilion__c>();
+                List<Pavilion__c> existPavList = new List<Pavilion__c>();
+
                 for(String pavilionName: pavilionNamesList){
-                    pavilionList.add(new Pavilion__c(Name = pavilionName, ExpoCAD_ID__c=eventRecord.ExpoCAD_ID__c+'.'+pavilionName , Event__c = eventRecord.Id));
+                    String pavExpocadId=eventRecord.ExpoCAD_ID__c+'.'+pavilionName;
+                    pavilionList.add(new Pavilion__c(Name = pavilionName, ExpoCAD_ID__c=pavExpocadId , Event__c = eventRecord.Id));
+                    pavilionExpoCADIds.add(pavExpocadId);
                 }
-                Database.UpsertResult[] upsertResult = Database.upsert(pavilionList, Pavilion__c.Fields.ExpoCAD_ID__c, false);
+                existPavList=[SELECT Id, Name, ExpoCAD_ID__c FROM Pavilion__c WHERE ExpoCAD_ID__c IN :pavilionExpoCADIds];
+                for (Pavilion__c pavilion : existPavList) {
+                    existingPavilionsMap.put(pavilion.ExpoCAD_ID__c.toLowerCase(), pavilion);
+                }
+                for (Pavilion__c pavRec : pavilionList) {
+                    if (!existingPavilionsMap.containsKey(pavRec.ExpoCAD_ID__c.toLowerCase())) {
+                        pavRecordsToAdd.put(pavRec.ExpoCAD_ID__c,pavRec);
+                    }
+                }
+                Database.UpsertResult[] upsertResult = Database.upsert(pavRecordsToAdd.values(), Pavilion__c.Fields.ExpoCAD_ID__c, false);
                 handleUpsertErrors(upsertResult);
-                for(Pavilion__c pavilion:pavilionList){
-                    pavilionMap.put(pavilion.ExpoCAD_ID__c, pavilion);
+                existingPavilionsMap.putAll(pavRecordsToAdd);
+                for(Pavilion__c pavilion:existingPavilionsMap.values()){
+                    pavilionMap.put(pavilion.ExpoCAD_ID__c.toLowerCase(), pavilion);
                 }
             }
 
             if(expoWrap.success){
                 List<ExpocadWrapper.BoothInfo> boothList = (List<ExpocadWrapper.BoothInfo>)JSON.deserialize(expoWrap.message, List<ExpocadWrapper.BoothInfo>.class);
-                if(expoWrapDeletedBooth.success){
-                    List<ExpocadWrapper.BoothInfo> deleteBoothList = (List<ExpocadWrapper.BoothInfo>)JSON.deserialize(expoWrapDeletedBooth.message, List<ExpocadWrapper.BoothInfo>.class);
-                    boothList.addAll(deleteBoothList);
-                }
                 for(ExpocadWrapper.BoothInfo booth:boothList){
+                    String standExpocadId=eventRecord.ExpoCAD_ID__c+'.'+booth.BoothNumber;
+                    String pavExpocadId=eventRecord.ExpoCAD_ID__c+'.'+booth.Pavilion;
+
                     Stand__c  stand= new Stand__c();
                     stand.Area__c=booth.NumericArea;
                     stand.Booth_Type__c=booth.BoothType;
                     stand.Dimensions__c=booth.Dimensions;
                     stand.Display_Name_Override__c=booth.DisplayNameOverride;
-                    stand.ExpoCAD_ID__c= booth.BoothNumber+'.'+eventRecord.ExpoCAD_ID__c;
+                    stand.ExpoCAD_ID__c= standExpocadId;
                     stand.ExpoCAD_Status__c=booth.Status;
                     stand.Is_Deleted__c=booth.IsDeleted;
                     stand.Is_On_Hold__c=booth.IsOnHold;
@@ -100,25 +110,17 @@ public  class ExpocadIntegrationLogic {
                     stand.Unit_Type__c=booth.UnitType;
                     stand.Width__c=booth.XSize;
                     stand.Event__c=eventRecord.Id;
-                    if (pavilionMap.containsKey(eventRecord.ExpoCAD_ID__c+'.'+booth.Pavilion)) {
-                        stand.Pavilion__c = pavilionMap.get(eventRecord.ExpoCAD_ID__c+'.'+booth.Pavilion).Id;
+                    if (pavilionMap.containsKey(pavExpocadId.toLowerCase())) {
+                        stand.Pavilion__c = pavilionMap.get(pavExpocadId.toLowerCase()).Id;
                     }
                     standList.add(stand);
+                    expocadIdsSet.add(standExpocadId);
                 }
 
-                // No pavilions and No Booths Found...
-                if(boothList.size()== 0 && pavilionNamesList.size()== 0){
-                    eventRecord.Details_Synced_with_ExpoCAD__c='Failure';
-                    eventRecord.Event_ExpoCAD_Error_Details__c=expoWrap.message;
+                // Update Event Status
+                eventRecord.Details_Synced_with_ExpoCAD__c = boothList.size()== 0 && pavilionNamesList.size()== 0 ? 'Failure' : 'Success';
+                eventRecord.Event_ExpoCAD_Error_Details__c = boothList.isEmpty() && pavilionNamesList.isEmpty() ? expoWrap.message : '';
 
-                }
-
-                // No Pavilions and Yes Booth Found
-                if(boothList.size() >= 0 && pavilionNamesList.size() >= 0){
-                    eventRecord.Details_Synced_with_ExpoCAD__c='Success';
-                    eventRecord.Event_ExpoCAD_Error_Details__c='';
-
-                }
             }else{
                 eventRecord.Details_Synced_with_ExpoCAD__c='Failure';
                 eventRecord.Event_ExpoCAD_Error_Details__c=expoWrap.message;
@@ -126,11 +128,75 @@ public  class ExpocadIntegrationLogic {
                 handleIntegrationException(expoWrap.message);
             }
 
-            //UPSERT STAND RECORDS
-            if (!standList.isEmpty()) {
-                Database.UpsertResult[] upsertStand = Database.upsert(standList, Stand__c.Fields.ExpoCAD_ID__c, false);
-                handleUpsertErrors(upsertStand);
+            if (!standList.isEmpty()) {                
+            
+                for (Stand__c stand : [SELECT Id, Name, Pavilion__c, ExpoCAD_ID__c FROM Stand__c WHERE ExpoCAD_ID__c IN :expocadIdsSet]) {
+                    existingStandMap.put(stand.ExpoCAD_ID__c.toLowerCase(), stand);
+                }
+            
+                for (Stand__c standRec : standList) {
+                    if (!existingStandMap.containsKey(standRec.ExpoCAD_ID__c.toLowerCase())) {
+                        // 9th July 2024 changes
+                        standRec.Pavilion__c = (!standRec.Is_Deleted__c && standRec.Pavilion__c != null) ? standRec.Pavilion__c : null;
+                        // 9th July 2024 changes
+                        recordsToAddMap.put(standRec.ExpoCAD_ID__c, standRec);
+                    } else {
+                        Stand__c exisStandRec = existingStandMap.get(standRec.ExpoCAD_ID__c.toLowerCase());
+
+                        exisStandRec.Pavilion__c = (!standRec.Is_Deleted__c && standRec.Pavilion__c != null) ? standRec.Pavilion__c : null;
+                        exisStandRec.Area__c = standRec.Area__c;
+                        exisStandRec.Booth_Type__c = standRec.Booth_Type__c;
+                        exisStandRec.Dimensions__c = standRec.Dimensions__c;
+                        exisStandRec.Display_Name_Override__c = standRec.Display_Name_Override__c;
+                        exisStandRec.ExpoCAD_Status__c = standRec.ExpoCAD_Status__c;
+                        exisStandRec.Is_Deleted__c = standRec.Is_Deleted__c;
+                        exisStandRec.Is_On_Hold__c = standRec.Is_On_Hold__c;
+                        exisStandRec.Is_Rented__c = standRec.Is_Rented__c;
+                        exisStandRec.Length__c = standRec.Length__c;
+                        exisStandRec.Open_Corners__c = standRec.Open_Corners__c;
+                        exisStandRec.Show_In_Show__c = standRec.Show_In_Show__c;
+                        exisStandRec.Status_Synced_with_ExpoCAD__c = 'Success';
+                        exisStandRec.Status_Last_Synced_with_ExpoCAD__c = System.now();
+                        exisStandRec.Unit_Type__c = standRec.Unit_Type__c;
+                        exisStandRec.Width__c = standRec.Width__c;
+                        recordsToAddMap.put(exisStandRec.ExpoCAD_ID__c, exisStandRec);
+                    }
+                }
             }
+
+            //on 24th June changes::For the  Pavilion stand is deleted off the floorplan, and  not  appearing as apart of the pavilion in Salesforce
+            // for (Stand__c stand : [SELECT Id,Name, Pavilion__c, ExpoCAD_ID__c FROM Stand__c WHERE Pavilion__c != null AND Pavilion__r.ExpoCAD_ID__c IN :pavilionMap.keySet()]) {
+            //     if (!existingStandMap.containsKey(stand.ExpoCAD_ID__c.toLowerCase())) {
+            //         stand.Pavilion__c = null;
+            //         stand.Is_Deleted__c = true;
+            //         stand.Is_On_Hold__c = false;
+            //         stand.Is_Rented__c = false;
+            //         recordsToAddMap.put(stand.ExpoCAD_ID__c, stand);
+            //         System.debug(stand.ExpoCAD_ID__c.toLowerCase()+'::'+stand.Name);    
+            //     }
+            // }
+
+
+            for (Stand__c stand : [SELECT Id,Name, Pavilion__c, ExpoCAD_ID__c FROM Stand__c WHERE Event__c=:eventRecord.Id]) {
+                if (stand.ExpoCAD_ID__c != null && !existingStandMap.containsKey(stand.ExpoCAD_ID__c.toLowerCase())) {
+                    if(stand.Pavilion__c!=null){
+                        stand.Pavilion__c = null;
+                    }
+                    stand.Is_Deleted__c = true;
+                    stand.Is_On_Hold__c = false;
+                    stand.Is_Rented__c = false;
+                    recordsToAddMap.put(stand.ExpoCAD_ID__c, stand);
+                    System.debug(stand.ExpoCAD_ID__c.toLowerCase()+'::'+stand.Name);    
+                }
+            }
+            // 24th June changes end::  
+            // Convert the map values to a list before the upsert
+            recordsToAdd.addAll(recordsToAddMap.values());
+        
+            Database.UpsertResult[] upsertStand = Database.upsert(recordsToAdd, Stand__c.Fields.ExpoCAD_ID__c, false);
+            handleUpsertErrors(upsertStand);
+            
+            
             
             // Update Event Status
             eventRecord.Last_Synced_with_ExpoCAD__c= System.now();
@@ -138,10 +204,7 @@ public  class ExpocadIntegrationLogic {
             update eventRecord;
 
         }catch(Exception exp){
-            eventRecord.Details_Synced_with_ExpoCAD__c='Failure';
-            eventRecord.Event_ExpoCAD_Error_Details__c='Exception:' + exp.getMessage() + exp.getLineNumber();
-            updateFromExpocad=true;
-            update eventRecord;
+            updateEventWithError(eventRecord, 'Exception:' + exp.getMessage() + exp.getLineNumber());
             handleException(exp);
             System.debug('Exception:' + exp.getMessage() + exp.getLineNumber());
         }
@@ -476,7 +539,7 @@ public  class ExpocadIntegrationLogic {
      private static void handleUpsertErrors(Database.UpsertResult[] upsertResults) {
         for(Database.UpsertResult result : upsertResults) {
             if(result.isSuccess()) {
-                System.debug('Record successfully inserted/updated with Id: ' + result.getId());
+                // System.debug('Record successfully inserted/updated with Id: ' + result.getId());
             } else {
                 for(Database.Error error : result.getErrors()) {
                     System.debug('Error message: ' + error.getMessage());
@@ -485,6 +548,13 @@ public  class ExpocadIntegrationLogic {
         }
     }
 
+
+    private static void updateEventWithError(Event__c eventRecord, String errorMessage) {
+        eventRecord.Details_Synced_with_ExpoCAD__c = 'Failure';
+        eventRecord.Event_ExpoCAD_Error_Details__c = errorMessage;
+        updateFromExpocad = true;
+        update eventRecord;
+    }
 
     
 }

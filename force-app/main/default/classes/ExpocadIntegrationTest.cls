@@ -48,7 +48,6 @@ public class ExpocadIntegrationTest {
         Test.startTest();
         ExpocadIntegration.getPavilionsByEvent(eventRec.ExpoCAD_ID__c);
         ExpocadIntegration.getBoothByEvent(eventRec.ExpoCAD_ID__c);
-        ExpocadIntegration.getDeletedBoothByEvent(eventRec.ExpoCAD_ID__c);
         ExpocadIntegration.getBoothByEventAndName(eventRec.ExpoCAD_ID__c , standRec.Name);
         ExpocadIntegration.setBoothToRent(eventRec.ExpoCAD_ID__c, standRec.Name, standRec.Account_ID__c);
         ExpocadIntegration.getExhibitorById(eventRec.ExpoCAD_ID__c , standRec.Account_ID__c);

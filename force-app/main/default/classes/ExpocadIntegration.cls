@@ -10,58 +10,50 @@ public class ExpocadIntegration {
     public ExpocadIntegration(){
         if(Schema.SObjectType.ExpocadeSessionToken__mdt.isAccessible() && Schema.SObjectType.ExpocadeSessionToken__mdt.fields.SessionToken__c.isAccessible()) {
             ExpocadeSessionToken__mdt expoCad = [SELECT Id, SessionToken__c, DeveloperName	, MasterLabel, ApiKey__c, Email__c   FROM ExpocadeSessionToken__mdt LIMIT 1];
-            sessionToken=expoCad.SessionToken__c;
+            if(expoCad != null) {
+                sessionToken=expoCad.SessionToken__c;
+            }
         }
     }
-    
-    public HttpResponse makeGetCallout(String endpoint) {
-        HttpRequest request = new HttpRequest();
-        request.setEndpoint(endpoint);
-        request.setMethod('GET');
-        request.setHeader('ApiSessionToken', sessionToken);
-        request.setTimeout(120000);
-        Http http = new Http();
-        HttpResponse response = http.send(request);
-        return response;
+
+    public static ExpocadEndpoints__c fetchExpocadEndpoints(){
+        if(Schema.SObjectType.ExpocadEndpoints__c.isAccessible()) {
+            ExpocadEndpoints__c	 expocadEndpoints = ExpocadEndpoints__c.getInstance();
+            return expocadEndpoints;
+        }
+        return null;
     }
 
-
-    public HttpResponse makePutCallout(String endpoint , String requestBody) {
+    private HttpResponse makeCallout(String endpoint, String method, String requestBody) {
         HttpRequest request = new HttpRequest();
         request.setEndpoint(endpoint);
-        request.setMethod('PUT');
+        request.setMethod(method);
         request.setHeader('ApiSessionToken', sessionToken);
-        request.setHeader('Content-Type', 'application/x-www-form-urlencoded');
-        request.setBody(requestBody);
-        request.setTimeout(120000);
-        // Create an HTTP client to send the request
-        Http http = new Http();
-        HttpResponse response = http.send(request);
-        return response;
-    }
-
-    public HttpResponse makePostCallout(String endpoint , String requestBody) {
-        HttpRequest request = new HttpRequest();
-        request.setEndpoint(endpoint);
-        request.setMethod('POST');
-        request.setHeader('ApiSessionToken', sessionToken);
-        request.setHeader('Content-Type', 'application/json; charset=utf-8');
-        request.setBody(requestBody);
+        if(method == 'PUT') {
+            request.setHeader('Content-Type', 'application/x-www-form-urlencoded');
+        } else if(method == 'POST') {
+            request.setHeader('Content-Type', 'application/json; charset=utf-8');
+        }
+        if(method== 'POST' ||  method =='PUT'){
+            request.setBody(requestBody);
+        }
         request.setTimeout(120000);
 
         // Create an HTTP client to send the request
         Http http = new Http();
-        HttpResponse response = http.send(request);
-        return response;
+        return http.send(request);
     }
-
     
     
     public static  ExpocadWrapper getPavilionsByEvent(String eventName){
     
         ExpocadIntegration expoIntegration = new ExpocadIntegration();
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
         // ===== HTTP GET CALLOUT=====
-        HttpResponse response= expoIntegration.makeGetCallout('callout:Expocad/EdgeApi/'+eventName+'/all');
+
+        HttpResponse response = expoIntegration.makeCallout('callout:Expocad/EdgeApi/' + eventName + expocadEndPoints.getAllPavilions__c, 'GET', null);
+
         if(response.getStatusCode() == 200){
             String jsonData=response.getBody();
             return new ExpocadWrapper(true, jsonData);
@@ -76,8 +68,11 @@ public class ExpocadIntegration {
     
     public static ExpocadWrapper getBoothByEvent(String eventName){
         
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();        
-        HttpResponse response= expoIntegration.makeGetCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/all?deletedFilter=all');
+        ExpocadIntegration expoIntegration = new ExpocadIntegration();
+		//Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.getBoothByEvent__c,'GET', null);
         
         System.debug(response.getBody());
         if (response.getStatusCode() == 200) {
@@ -90,25 +85,12 @@ public class ExpocadIntegration {
         
     }
 
-    public static ExpocadWrapper getDeletedBoothByEvent(String eventName){
-        
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();        
-        HttpResponse response= expoIntegration.makeGetCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/all?deletedFilter=2');
-        
-        System.debug(response.getBody());
-        if (response.getStatusCode() == 200) {
-            String jsonData=response.getBody();
-            return new ExpocadWrapper(true, jsonData);
-        } else {
-            System.debug('HTTP Request failed with status code ' + response.getStatusCode());
-            return new ExpocadWrapper(false, response.getStatusCode()+':::'+response.getBody());
-        }
-        
-    }
-    
     public static ExpocadWrapper getBoothByEventAndName(String eventName , String boothNumber){
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();        
-        HttpResponse response= expoIntegration.makeGetCallout('callout:Expocad/EdgeApi/'+eventName+'/booths?boothNumber='+boothNumber);
+        ExpocadIntegration expoIntegration = new ExpocadIntegration(); 
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.getBoothByEventAndName__c+boothNumber, 'GET', null);
         
         if (response.getStatusCode() == 200) {
             String jsonData = response.getBody(); // Your JSON data as a string
@@ -123,8 +105,11 @@ public class ExpocadIntegration {
     public static ExpocadWrapper getExhibitorById( String eventName ,  String exhbitorId){
         ExpocadIntegration expoIntegration = new ExpocadIntegration();
         
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
         // Create an HTTP client to send the request
-        HttpResponse response= expoIntegration.makeGetCallout('callout:Expocad/EdgeApi/'+eventName+'/exhibitors?id='+exhbitorId);
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.getExhibitorById__c+exhbitorId, 'GET', null);
         if (response.getStatusCode() == 200) {
             System.debug(response.getBody());
             String jsonData = response.getBody(); // Your JSON data as a string
@@ -138,9 +123,12 @@ public class ExpocadIntegration {
     
     public static ExpocadWrapper setBoothHold(String eventName, String boothNumber, String exhibitorId){
                 
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();   
+        ExpocadIntegration expoIntegration = new ExpocadIntegration(); 
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
         String requestBody = 'boothNumber=' + EncodingUtil.urlEncode(boothNumber, 'UTF-8') + '&exhibitorId=' + EncodingUtil.urlEncode(exhibitorId, 'UTF-8');
-        HttpResponse response= expoIntegration.makePutCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/hold' , requestBody);
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.setBoothHold__c, 'PUT', requestBody);
         
         if (response.getStatusCode() == 200) {
             return new ExpocadWrapper(true, '');
@@ -153,9 +141,13 @@ public class ExpocadIntegration {
     }
     
     public static ExpocadWrapper setBoothToUnhold(String eventName, String boothNumber){
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();   
+        ExpocadIntegration expoIntegration = new ExpocadIntegration();
+        
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
         String requestBody = 'boothNumber=' + EncodingUtil.urlEncode(boothNumber, 'UTF-8');
-        HttpResponse response= expoIntegration.makePutCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/unhold' , requestBody);
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.setBoothToUnhold__c ,'PUT', requestBody);
         
         if (response.getStatusCode() == 200) {
             return new ExpocadWrapper(true, '');
@@ -167,12 +159,15 @@ public class ExpocadIntegration {
     }
     
     public static ExpocadWrapper setBoothToRent(String eventName, String boothNumber, String exhibitorId){
-        system.Debug('called SetBoothToRent');
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();   
+            
+        ExpocadIntegration expoIntegration = new ExpocadIntegration(); 
+        
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
         String requestBody = 'boothNumber=' + EncodingUtil.urlEncode(boothNumber, 'UTF-8') + '&exhibitorId=' + EncodingUtil.urlEncode(exhibitorId, 'UTF-8');
-        System.Debug('requestBody'+requestBody);
-        HttpResponse response= expoIntegration.makePutCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/rent' , requestBody);
-        System.Debug('response'+response);
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.setBoothToRent__c , 'PUT' ,requestBody);
+        
         if (response.getStatusCode() == 200) {
             return new ExpocadWrapper(true, '');
                
@@ -186,10 +181,13 @@ public class ExpocadIntegration {
     public static ExpocadWrapper setBoothToUnrent(String eventName , String boothNumber, String exhibitorId){
 
         ExpocadIntegration expoIntegration = new ExpocadIntegration(); 
-          
+        
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
         String requestBody = 'boothNumber=' + EncodingUtil.urlEncode(boothNumber, 'UTF-8');
         
-        HttpResponse response= expoIntegration.makePutCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/unrent' , requestBody);
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.setBoothToUnrent__c , 'PUT', requestBody);
         
         if (response.getStatusCode() == 200) {
             System.debug(response.getBody());
@@ -204,9 +202,13 @@ public class ExpocadIntegration {
     
     public static ExpocadWrapper resetBoothDisplayName(String eventName, String boothNumber){
         
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();   
+        ExpocadIntegration expoIntegration = new ExpocadIntegration(); 
+        
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
         String requestBody = 'boothNumber=' + EncodingUtil.urlEncode(boothNumber, 'UTF-8');
-        HttpResponse response= expoIntegration.makePutCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/displayNameOverride/reset' , requestBody);
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.resetBoothDisplayName__c , 'PUT', requestBody);
         
         if (response.getStatusCode() == 200) {
             return new ExpocadWrapper(true, '');
@@ -219,8 +221,12 @@ public class ExpocadIntegration {
     
     public static ExpocadWrapper addNewExhibitor(String eventName, String requestBody){
         
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();  
-        HttpResponse response= expoIntegration.makePostCallout('callout:Expocad/EdgeApi/'+eventName+'/exhibitors/add', requestBody);
+        ExpocadIntegration expoIntegration = new ExpocadIntegration();
+        
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.addNewExhibitor__c, 'POST', requestBody);
       
          if (response.getStatusCode() == 200 || response.getStatusCode()== 201) {
             String jsonData=response.getBody();
@@ -234,9 +240,13 @@ public class ExpocadIntegration {
     
     
     public static ExpocadWrapper setBoothChildExhibitors(String eventName, String boothNumber, String childExhibitorId){
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();   
+        ExpocadIntegration expoIntegration = new ExpocadIntegration(); 
+        
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
         String requestBody = 'childExhibitorId=' + EncodingUtil.urlEncode(childExhibitorId, 'UTF-8') + '&boothNumber=' + EncodingUtil.urlEncode(boothNumber, 'UTF-8');
-        HttpResponse response= expoIntegration.makePutCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/childExhibitor/add' , requestBody);
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.setBoothChildExhibitors__c , 'PUT', requestBody);
         if (response.getStatusCode() == 200) {
             return new ExpocadWrapper(true, '');
                
@@ -249,10 +259,11 @@ public class ExpocadIntegration {
 
     public static ExpocadWrapper removeBoothClass(String eventName , String boothNumber, String classId){
         ExpocadIntegration expoIntegration = new ExpocadIntegration();   
-
+		//Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
 
         String requestBody = 'classId=' + EncodingUtil.urlEncode(classId, 'UTF-8')+'&boothNumber=' + EncodingUtil.urlEncode(boothNumber, 'UTF-8');
-        HttpResponse response= expoIntegration.makePutCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/classes/remove' , requestBody);
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.removeBoothClass__c, 'PUT', requestBody);
         
         if (response.getStatusCode() == 200) {
             return new ExpocadWrapper(true, '');
@@ -264,9 +275,13 @@ public class ExpocadIntegration {
     }
 
     public static ExpocadWrapper setBoothClass(String eventName , String boothNumber, String classId){
-        ExpocadIntegration expoIntegration = new ExpocadIntegration();   
+        ExpocadIntegration expoIntegration = new ExpocadIntegration();  
+        
+        //Fetch endpoints from custom setting
+        ExpocadEndpoints__c	 expocadEndPoints = fetchExpocadEndpoints();
+        
         String requestBody = 'classId=' + EncodingUtil.urlEncode(classId, 'UTF-8')+'&boothNumber=' + EncodingUtil.urlEncode(boothNumber, 'UTF-8');
-        HttpResponse response= expoIntegration.makePutCallout('callout:Expocad/EdgeApi/'+eventName+'/booths/classes/apply' , requestBody);
+        HttpResponse response= expoIntegration.makeCallout('callout:Expocad/EdgeApi/'+eventName+expocadEndPoints.setBoothClass__c , 'PUT',requestBody);
         
         if (response.getStatusCode() == 200) {
             return new ExpocadWrapper(true, '');

@@ -348,7 +348,6 @@ public class StandTriggerHandler{
         // Execute batch if there are stands to sync and custom setting is enabled
         if (!standIdsToSync.isEmpty() && customSettings != null && customSettings.StandTrigger__c) {
             ExpocadBatchClass batch = new ExpocadBatchClass(standIdsToSync);
-            System.Debug(standIdsToSync+ 'check list');
             Database.executeBatch(batch, 10);        
         }
     }

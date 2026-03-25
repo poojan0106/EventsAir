@@ -3,8 +3,77 @@ public class ExpocadBatchClassTest {
     @testSetup
     static void setupTestData() {
         // Create test data for Account
-        Account accountRec = new Account(Name='Test Account');
+        Account accountRec = new Account(Name='Test Account',     
+        BillingStreet = '333 George Street',
+        BillingCity = 'Sydney',
+        BillingPostalCode = '2000',
+        BillingState = 'New South Wales',
+        BillingCountry = 'Australia'
+
+        );
+        
         insert accountRec;
+
+        Pricebook2 priceBook = new Pricebook2(
+            Name = 'Example Price Book',
+            Description = 'Description',
+            IsActive = true
+        );
+
+        insert priceBook;
+
+        // Create a Product
+        Product2 product = new Product2(
+            Name = 'Example Product',
+            Description = 'This is the Product description.',
+            Target_Category__c = 'Example Category',
+            ProductCode = 'EX1234',
+            StockKeepingUnit = 'EX5678',
+            Family = 'Example Product Family',
+            QuantityUnitOfMeasure = 'inches',
+            DisplayUrl = 'https://www.example.com/',
+            IsActive = true
+        );
+
+        insert product;
+
+        // Insert the Product in the Standard Price Book
+        PricebookEntry standardPriceBookEntry = new PricebookEntry(
+            Pricebook2Id = Test.getStandardPricebookId(),
+            Product2Id = product.Id,
+            UnitPrice = 100.00,
+            UseStandardPrice = false,
+            IsActive = true
+        );
+
+        insert standardPriceBookEntry;
+
+        // Insert the Product in the New Price Book
+        PricebookEntry priceBookEntry = new PricebookEntry(
+            Pricebook2Id = priceBook.Id,
+            Product2Id = product.Id,
+            UnitPrice = 100.00,
+            UseStandardPrice = false,
+            IsActive = true
+        );
+
+        insert priceBookEntry;
+
+        Opportunity opp = new Opportunity();
+        opp.Name = 'Opportunity 1';
+        opp.AccountId = accountRec.Id;
+        opp.CloseDate = date.today().addYears(-1);
+        opp.StageName = 'Closed Won';   
+        insert opp;
+        //Add products to opportunities
+        List<OpportunityLineItem> lines = new List<OpportunityLineItem>();
+
+        List<Opportunity> oppList = [Select Id,Name from Opportunity];
+        for(Opportunity record: oppList){
+            lines.add(new OpportunityLineItem(PricebookEntryId=priceBookEntry.Id, OpportunityId=record.Id, UnitPrice=priceBookEntry.UnitPrice, Quantity=1));
+        }
+
+        insert lines;
 
         // Create test data for Event__c
         Event__c eventRec = new Event__c(
@@ -23,7 +92,8 @@ public class ExpocadBatchClassTest {
             Account_ID__c = accountRec.Id,
             Account_Name__c=accountRec.Name,
             Trading_As__c=exhRec.Id,
-            Is_On_Hold__c=true
+            Is_On_Hold__c=true,
+            Currently_Holding_Opportunity__c=opp.Id
         );
         insert standRec;
     }
@@ -418,7 +488,7 @@ public class ExpocadBatchClassTest {
     @isTest
     static void testBatchProcessing11() {
 
-        Stand__c stand=[Select Id, Name , Is_On_Hold__c, Event_Expocad_Id__c, Account_ID__c from Stand__c LIMIT 1];
+        Stand__c stand=[Select Id, Name , Is_On_Hold__c, Currently_Holding_Opportunity__c, Currently_Holding_Opportunity__r.Space_Type__c ,Event_Expocad_Id__c, Account_ID__c from Stand__c LIMIT 1];
 
         String jsonData='{"ExhibitorId":"'+stand.Account_ID__c+'","BoothNumber":"G18","Dimensions":"3m x 3m","DisplayNameOverride":"","XSize":"3m","YSize":"3m","Area":"9 m²","NumericArea":9,"CalculatedArea":null,"ObstructionsArea":null,"Status":"Initial","BoothClasses":["Pavilion Booth"],"ChildExhibitors":[],"HoldComment":"", "HoldExhibitorId":"", "HoldExhibitorName":"", "IsDeleted":false, "IsOnHold":false, "IsRented":false}';
 

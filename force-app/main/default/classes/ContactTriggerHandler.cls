@@ -1,6 +1,6 @@
 public class ContactTriggerHandler {
     
-    /*public static void linkContactToAccount(List<Contact> lstCon){
+    public static void linkContactToAccount(List<Contact> lstCon){
         
         Set<String> setOfDomainName = new Set<String>();
         
@@ -89,5 +89,5 @@ public class ContactTriggerHandler {
             }            
         }
         
-    }*/
+    }
 }

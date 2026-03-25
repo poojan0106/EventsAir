@@ -21,9 +21,7 @@ public class ImportRegistartionController {
         
         System.debug('@@@ lstevent = '+lstevent);
         if(lstevent.size() >0 ) {
-            
-                Database.executeBatch(new ImportRegistartionFromEventsAirBatch(lstevent[0].EventsAirID__c, lstevent[0].Id), 100);
-                    
+            Database.executeBatch(new ImportRegistartionFromEventsAirBatch(lstevent[0].EventsAirID__c, lstevent[0].Id), 100);
         }        
         
         
