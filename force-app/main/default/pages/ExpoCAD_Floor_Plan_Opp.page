@@ -16,9 +16,10 @@
         </p>
     </div>
     <div id="expoFrame">
-        <apex:iframe id="expoApexFrame" src="https://www.expocad.com/host/fx/dea/{!Opportunity.Event__r.ExpoCAD_ID__c}/exfx.html?mode=sales" />
+
+        <!--<apex:iframe id="expoApexFrame" src="https://www.expocad.com/host/fx/dea/{!Opportunity.Event__r.ExpoCAD_ID__c}/exfx.html?mode=sales" />-->
  
-        <!-- <apex:iframe id="expoApexFrame" src="https://www.expocad.com/host/fx/dea/{!Opportunity.Exhibition__r.ExpoCADID__c}/#floorplan" /> -->
+        <apex:iframe id="expoApexFrame" src="https://divcomausb.expocad.com/Events/{!Opportunity.Event__r.ExpoCAD_ID__c}/index.html?mode=sales" /> 
     </div>
     
     <script type="text/javascript">
@@ -29,7 +30,7 @@
         }
         
         window.addEventListener("message", function(event) {
-            if (event.origin !== "https://www.expocad.com") return;
+            if (event.origin !== "https://divcomausb.expocad.com") return;
           
             if (event.data == "CloseFX") {
                 var frame = document.getElementById('expoApexFrame');
@@ -45,18 +46,19 @@
             var frame = document.getElementById('expoApexFrame');
             
             <!-- Pass FX Sales creds to iFrame -->
-            frame.contentWindow.postMessage('{!$User.ExpoCAD_Credentials__c}', 'https://www.expocad.com');            
+            frame.contentWindow.postMessage('{!$User.ExpoCAD_Credentials__c}', 'https://divcomausb.expocad.com');
+            
         }
 
        
         function doFxSalesLogout(event) {
             var frame = document.getElementById('expoApexFrame');
-            frame.contentWindow.postMessage("fxSalesLogout", 'https://www.expocad.com');
+            frame.contentWindow.postMessage("fxSalesLogout", 'https://divcomausb.expocad.com');
         }
         
         function doZoomBooth(booth) {
             var frame = document.getElementById('expoApexFrame');
-            frame.contentWindow.postMessage("zoombooth", 'https://www.expocad.com');
+            frame.contentWindow.postMessage("zoombooth", 'https://divcomausb.expocad.com');
         }
      
 

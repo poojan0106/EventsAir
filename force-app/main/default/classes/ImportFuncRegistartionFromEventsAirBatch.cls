@@ -14,7 +14,9 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
     Integer contactsLimit = Integer.valueOf(System.Label.EventsAirFun_Attendee_Contact_Limit);
     Integer regLimit = Integer.valueOf(System.Label.EventsAir_Function_Registartion_Limit);
     List<Contact> lstInsrtCon;
+    List<Contact> lstUpdateCon;
     List<Lead> lstInsrtLead;
+    List<Lead> lstUpdateLead;
     List<Product_Service_Option__c> lstInsrtProdAndServices;
     List<Function__c> lstInsrtFun; 
     public List<Event__c> eventData = new List<Event__c>();
@@ -34,6 +36,57 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         sfeventId = strsfeventId;  // set Salesforce Event RecordId value in sfeventId
         this.eventData = [Select Id, Name, EventsAirID__c, Open_Date__c, Close_Date__c, Event_Logo__c, New_Event_Logo__c, Is_Pricebook_Created__c,
                      Event_Category__c, RecordType.Name FROM Event__c where Id = :sfeventId LIMIT 1];
+    }
+
+    @TestVisible
+    private static void applyStateCountryFields(Contact contactRecord, Map<String, Object> eventContactMap) {
+        Map<String, Object> eventAddressMap = getEventAddressMap(eventContactMap);
+        if (eventAddressMap == null || !areCoreAddressFieldsBlank(contactRecord)) {
+            return;
+        }
+
+        if (String.isBlank(contactRecord.MailingCountry)) {
+            contactRecord.MailingCountry = getAddressValue(eventAddressMap.get('country'));
+        }
+        if (String.isBlank(contactRecord.MailingState)) {
+            contactRecord.MailingState = getAddressValue(eventAddressMap.get('state'));
+        }
+    }
+
+    @TestVisible
+    private static void applyStateCountryFields(Lead leadRecord, Map<String, Object> eventContactMap) {
+        Map<String, Object> eventAddressMap = getEventAddressMap(eventContactMap);
+        if (eventAddressMap == null || !areCoreAddressFieldsBlank(leadRecord)) {
+            return;
+        }
+
+        if (String.isBlank(leadRecord.Country)) {
+            leadRecord.Country = getAddressValue(eventAddressMap.get('country'));
+        }
+        if (String.isBlank(leadRecord.State)) {
+            leadRecord.State = getAddressValue(eventAddressMap.get('state'));
+        }
+    }
+
+    private static Map<String, Object> getEventAddressMap(Map<String, Object> eventContactMap) {
+        Object eventAddress = eventContactMap.get('primaryAddress');
+        return eventAddress instanceof Map<String, Object> ? (Map<String, Object>) eventAddress : null;
+    }
+
+    private static Boolean areCoreAddressFieldsBlank(Contact contactRecord) {
+        return String.isBlank(contactRecord.MailingCity)
+            && String.isBlank(contactRecord.MailingStreet)
+            && String.isBlank(contactRecord.MailingPostalCode);
+    }
+
+    private static Boolean areCoreAddressFieldsBlank(Lead leadRecord) {
+        return String.isBlank(leadRecord.City)
+            && String.isBlank(leadRecord.Street)
+            && String.isBlank(leadRecord.PostalCode);
+    }
+
+    private static String getAddressValue(Object rawValue) {
+        return rawValue == null ? null : String.valueOf(rawValue);
     }
     
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
@@ -196,7 +249,7 @@ public class ImportFuncRegistartionFromEventsAirBatch implements Database.Batcha
         // Return the response list
         return lstofresponseWrapper;
     }
-    
+
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
         
         // Serialize the ResponseWrapper to a JSON string
@@ -317,7 +370,9 @@ try{
         
         // Lists to store records for insertion
         lstInsrtLead = new List<Lead>();
+        lstUpdateLead = new List<Lead>();
         lstInsrtCon = new List<Contact>();
+        lstUpdateCon = new List<Contact>();
         lstInsrtProdAndServices = new List<Product_Service_Option__c>();
 
         // Sets and Maps for handling domain names and account information
@@ -478,23 +533,27 @@ try{
         }
         
         // fetch contact from sf based on combined String
-        List<Contact> listOfAllContact = [SELECT Id, FirstName, LastName, Email, CombinedString__c FROM Contact
-                                             WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
+        List<Contact> listOfAllContact = [SELECT Id, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c, MailingCity, MailingCountry, MailingState, MailingStreet, MailingPostalCode FROM Contact
+                                          WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueContactString = new Map<String, Boolean>();
-            
+        Map<String, Contact> mapOfUniqueContactStringToUpdate = new Map<String, Contact>();
+        
         //loop through existing Contacts and fill the map to use for mapping with function registration
         for(Contact objContact :listOfAllContact){
             mapOfUniqueContactString.put(objContact.CombinedString__c, true); 
+            mapOfUniqueContactStringToUpdate.put(objContact.CombinedString__c, objContact); 
         }
-
+        
         // fetch Lead from sf based on combined String
-        List<Lead> listOfAllLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead
-                                          WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
+        List<Lead> listOfAllLead = [SELECT Id, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c, PostalCode, State, Country, Street, City FROM Lead
+                                    WHERE CombinedString__c in :setOfCombinedEventsAirAttendee AND IsConverted = false LIMIT 50000];
         Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
-            
+        Map<String, Lead> mapOfUniqueLeadStringToUpdate = new Map<String, Lead>();
+        
         //loop through existing Leads and fill the map to use for mapping with function registration
         for(Lead objLead :listOfAllLead){
             mapOfUniqueLeadString.put(objLead.CombinedString__c, true); 
+            mapOfUniqueLeadStringToUpdate.put(objLead.CombinedString__c, objLead); 
         }
 
         // loop through event's air contact for create Lead/Contact based on Paid/Unpaid function registrations
@@ -536,16 +595,15 @@ try{
                     Map<String, Object> eventFunregPaymentdetails = (Map<String, Object>) eventFunReg.get('paymentDetails');
                     Decimal totalcharge = (Decimal) eventFunregPaymentdetails.get('totalChargeAmount');
                 
-                    //create contact and account in salesforce if not exist for paid registartions
-                    if(totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString)) {
-                    
-                        // contact creation for paid function registrations
-                        Contact objcon = new Contact();
-                        objcon.RecordTypeId = Schema.SObjectType.Contact.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();  
-            
-                        if (RecordType == 'Mumbrella') {
-                            objcon.Business_Unit__c = 'Mumbrella';
-                        } else {
+                                        // update existing contact for paid registrations; otherwise use/create a Lead
+                    if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)){
+                        // contact update for paid function registrations
+                        Contact objcon = mapOfUniqueContactStringToUpdate.get(CombinedString);
+                        if (objCon.Organization_Name__c == null || objCon.Organization_Name__c == '') {
+                            objCon.Organization_Name__c = (String) eventConMap.get('organizationName');
+                        }
+
+                        if (RecordType != 'Mumbrella') {
                             List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
                             for (Object fields : lsteventsairCustomFields) {
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
@@ -562,137 +620,114 @@ try{
                                     }
                                 }
                             }
-                            objcon.Business_Unit__c = 'Divcom'; 
                         }
 
-                        objcon.Organization_Name__c = (String) eventConMap.get('organizationName');
-                        objcon.EventsAir_Con_ID__c = (String) eventConMap.get('id');
+                        applyStateCountryFields(objCon, eventconmap);
+                        lstUpdateCon.add(objcon);
+                    } else if(!mapOfUniqueContactString.containsKey(CombinedString) && !mapOfUniqueLeadString.containsKey(CombinedString)){
+                        // create lead for unpaid function registration if CombinedString is not found in exiting contact OR in lead
+                        //lead field mapping
+                        Lead newLead = new Lead();
+                        newLead.RecordTypeId = Schema.SObjectType.Lead.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();
                         String strFirstName = (String) eventConMap.get('firstName');
-
                         if (strFirstName != null )  {
                             if(strFirstName.length() <= 40) {
-                                objCon.FirstName = strFirstName.trim();
+                                newLead.FirstName= strFirstName.trim();
                             } else {
-                                objCon.FirstName = strFirstName.substring(0,40).trim();
+                                newLead.FirstName = strFirstName.substring(0,40).trim();
                             }
                         } else {
-                            objCon.FirstName = '';
+                            strFirstName = ''; 
                         }
-            
+
                         String strLastName = (String) eventConMap.get('lastName');
-                        if(strLastName == null || strLastName == '') {
-                            objcon.LastName = 'UnKnown';
+                        if(strLastName == null || strLastName == '' ) {
+                            newLead.LastName = 'UnKnown';
                         } else {
-                            objcon.LastName = strLastName.trim();
-                        }     
-            
-                        //objCon.Events_Air_Contact_Id__c = (String) eventConMap.get('id');
+                            newLead.LastName = strLastName.trim();
+                        }
+
+                        //newLead.EventsAir_Contact_Id__c = (String) eventConMap.get('id');
                         String stremail = (String) eventConMap.get('primaryEmail');
                         if(stremail != null && stremail != '') {
                             stremail = stremail.trim();
-                            objcon.Email = stremail;
+                            newLead.Email = stremail;
                         } else {
-                            objcon.Email = '';
+                            newLead.Email = '';
                         }
 
                         String strWorkPhone = (String) eventConMap.get('workPhone');
                         if(strWorkPhone != null && strWorkPhone != '') {
                             strWorkPhone = strWorkPhone.trim();
-                            objcon.MobilePhone = strWorkPhone;
-                            objcon.Phone = strWorkPhone;
+                            newLead.MobilePhone = strWorkPhone;
+                            newLead.Phone = strWorkPhone;
                         }
 
-                        if(setOfGenericDomain.contains(strAccdomainname)) {
-                            // Assign AccountId to contact Prioirty :- organization name match                       
+                        newLead.Event_Category__c = eventCategory;
+
+                        if (RecordType == 'Mumbrella') {
+                            newLead.Business_Unit__c = 'Mumbrella';
+                        } else {
+                            List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
                             
-                            if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
-                                System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccountId.get(orgName));
-                                objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
-                            }
-                        } else {              
-                            // Assign AccountId to contact Prioirty :-  1) domain name match 2) organization name match                       
-                            if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
-                                objcon.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-                            } else if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
-                                objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
+                            for (Object fields : lsteventsairCustomFields) {
+                                Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
+                                String FieldName = (String) customFieldsMap.get('name');
+                                if (FieldName != '' && FieldName != null) {
+                                    if (FieldName =='Industry') {
+                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Company Size'){
+                                        newLead.Company_Size__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function'){
+                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                }
+                            }  
+                            newLead.Business_Unit__c = 'Divcom';
+                        }           
+
+                        String strOrganization = (String) eventConMap.get('organizationName');
+                        if(strOrganization != null && strOrganization != '') {
+                            newLead.Company = strOrganization;
+                        }
+                        else{
+                            newLead.Company = 'Unknown';
+                        }
+                        newLead.Status = 'New';
+
+                        applyStateCountryFields(newLead, eventconmap);
+                        lstInsrtLead.add(newLead);
+                    } else if(!mapOfUniqueContactString.containsKey(CombinedString) && mapOfUniqueLeadStringToUpdate.containsKey(CombinedString)) {
+                        // update lead for unpaid function registration
+                        Lead newLead = mapOfUniqueLeadStringToUpdate.get(CombinedString);
+
+                        if (newLead.Company == null || newLead.Company == '') {
+                            newLead.Company = (String) eventConMap.get('organizationName');
+                        }
+                        if (RecordType != 'Mumbrella') {
+                            List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
+                            
+                            for (Object fields : lsteventsairCustomFields) {
+                                Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
+                                String FieldName = (String) customFieldsMap.get('name');
+                                if (FieldName != '' && FieldName != null) {
+                                    if (FieldName =='Industry') {
+                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Company Size'){
+                                        newLead.Company_Size__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function'){
+                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                }
                             }  
                         }
-                        lstInsrtCon.add(objcon);
-                    } else {
-                        // create lead for unpaid function registration if CombinedString is not found in exiting contact OR in lead
-                        if(!mapOfUniqueLeadString.containsKey(CombinedString)){
-        
-                            //lead field mapping
-                            Lead newLead = new Lead();
-                            newLead.RecordTypeId = Schema.SObjectType.Lead.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();
-                            String strFirstName = (String) eventConMap.get('firstName');
-                            if (strFirstName != null )  {
-                                if(strFirstName.length() <= 40) {
-                                    newLead.FirstName= strFirstName.trim();
-                                } else {
-                                    newLead.FirstName = strFirstName.substring(0,40).trim();
-                                }
-                            } else {
-                                strFirstName = ''; 
-                            }
 
-                            String strLastName = (String) eventConMap.get('lastName');
-                            if(strLastName == null || strLastName == '' ) {
-                                newLead.LastName = 'UnKnown';
-                            } else {
-                                newLead.LastName = strLastName.trim();
-                            }
-
-                            //newLead.EventsAir_Contact_Id__c = (String) eventConMap.get('id');
-                            String stremail = (String) eventConMap.get('primaryEmail');
-                            if(stremail != null && stremail != '') {
-                                stremail = stremail.trim();
-                                newLead.Email = stremail;
-                            } else {
-                                newLead.Email = '';
-                            }
-
-                            String strWorkPhone = (String) eventConMap.get('workPhone');
-                            if(strWorkPhone != null && strWorkPhone != '') {
-                                strWorkPhone = strWorkPhone.trim();
-                                newLead.MobilePhone = strWorkPhone;
-                                newLead.Phone = strWorkPhone;
-                            }
-
-                            newLead.Event_Category__c = eventCategory;
-                            newLead.Business_Unit__c = 'Divcom';
-
-                            if (RecordType != 'Mumbrella') {
-                                List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
-                                
-                                for (Object fields : lsteventsairCustomFields) {
-                                    Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
-                                    String FieldName = (String) customFieldsMap.get('name');
-                                    if (FieldName != '' && FieldName != null) {
-                                        if (FieldName =='Industry') {
-                                            newLead.Industry__c =(String) customFieldsMap.get('value');
-                                        }
-                                        if(FieldName == 'Company Size'){
-                                            newLead.Company_Size__c = (String) customFieldsMap.get('value');
-                                        }
-                                        if(FieldName == 'Job Function'){
-                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                        }
-                                    }
-                                }  
-                            }           
-
-                            String strOrganization = (String) eventConMap.get('organizationName');
-                            if(strOrganization != null && strOrganization != '') {
-                                newLead.Company = strOrganization;
-                            }
-                            else{
-                                newLead.Company = 'Unknown';
-                            }
-                            newLead.Status = 'New';
-                            lstInsrtLead.add(newLead);
-                            mapOfUniqueLeadString.put(newLead.CombinedString__c , true);
-                        }
+                        applyStateCountryFields(newLead, eventconmap);
+                        lstupdateLead.add(newLead);
                     }
                 }
             }
@@ -700,8 +735,8 @@ try{
 
 
         // Insert Contacts
-        if (!lstInsrtCon.isEmpty()) {            
-            insertContactsIfNotExist(lstInsrtCon, mapOfUniqueContactString);   
+        if (!lstInsrtCon.isEmpty() || !lstUpdateCon.isEmpty()) {            
+            insertContactsIfNotExist(lstInsrtCon, mapOfUniqueContactString, lstUpdateCon);   
             system.debug('insertContactsIfNotExist');
         }
 
@@ -714,14 +749,14 @@ try{
         }
         
         // Insert Lead
-        if (!lstInsrtLead.isEmpty()) {
-            insertLeadsIfNotExist(lstInsrtLead, mapOfUniqueLeadString); 
+        if (!lstInsrtLead.isEmpty() || !lstUpdateLead.isEmpty()) {
+            insertLeadsIfNotExist(lstInsrtLead, mapOfUniqueLeadString, lstUpdateLead); 
             system.debug('insertLeadsIfNotExist');
         }
 
         // fetch all Lead
         List<Lead> LstOfExtistingLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead 
-                                            WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
+                                            WHERE CombinedString__c in :setOfCombinedEventsAirAttendee AND IsConverted = false LIMIT 50000];
     
         for(Lead objLead :LstOfExtistingLead) {
             mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
@@ -785,9 +820,7 @@ try{
                     prodAndService.Marketing_Value__c = (String) prodAndSerMap.get('value');
                     
                     if(Finalstring != null && Finalstring != '') {
-                        if(mapOfContactStringAndId.containsKey(Finalstring) && mapOfLeadStringAndId.containsKey(Finalstring)) {
-                            prodAndService.Lead__c = mapOfLeadStringAndId.get(Finalstring);
-                        }else if(mapOfContactStringAndId.containsKey(Finalstring)){
+                        if(mapOfContactStringAndId.containsKey(Finalstring)){
                             prodAndService.Contact__c = mapOfContactStringAndId.get(Finalstring);
                         }else {
                             // connect with exiting or newly created lead
@@ -831,7 +864,7 @@ try{
                     if(checkInDate != null) {
                         objreg.CheckInDate__c = (Datetime) JSON.deserialize('"' + checkInDate + '"', Datetime.class);                  
                     }
-					mapOfEventsairRegIdandCheckidDate.put((string)eventReg.get('id'),checkInDate);
+                    mapOfEventsairRegIdandCheckidDate.put((string)eventReg.get('id'),checkInDate);
                     if(checkOutDate != null) {
                         objreg.CheckOutDate__c  = (Datetime) JSON.deserialize('"' + checkOutDate + '"', Datetime.class);                     
                     }
@@ -842,7 +875,7 @@ try{
                     if(Finalstring != null && Finalstring != '') {
                         
                         // connect contact with paid function registrations
-                        if( totalcharge > 0 && mapOfContactStringAndId.containsKey(Finalstring)) {
+                        if( mapOfContactStringAndId.containsKey(Finalstring)) {
                             objreg.Contact__c = mapOfContactStringAndId.get(Finalstring);
                         }else {
                             // connect contact if it is created before
@@ -894,7 +927,7 @@ try{
                             objOpp.OwnerId = mapOfDomainNameAndAccOwnerId.get(strAccdomainname);
                         }
                         
-                        objOpp.Is_Private__c = false;	
+                        objOpp.Is_Private__c = false;   
                         objOpp.LeadSource = 'EventsAir';
                         if(checkInDate != null) {
                             objOpp.Closedate = Date.valueOf(checkInDate);                  
@@ -973,14 +1006,14 @@ try{
     }  
 
     // Method for insert only new Contacts if not exist in salesforce
-    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Map<String, Boolean> mapOfUniqueContactString) {
-
+    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Map<String, Boolean> mapOfUniqueContactString , List<Contact> lstUpdateCon) {
+        
         List<Contact> FinalListOfContactToInsert = new List<Contact>();
         Set<String> setOfCurrentContactCombinedData = new Set<String>();
         
         //loop through the passed data of contact for insert and extract unique contacts for insert
         for(Contact objcontact :contactsToInsert){
-
+            
             String strcombinedEventsAirAttendee = objcontact.FirstName + objcontact.LastName + objcontact.Email; 
             strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
             
@@ -995,13 +1028,37 @@ try{
         }
         
         if(FinalListOfContactToInsert.size()>0){
-            Database.insert(FinalListOfContactToInsert,false);
-        } 
+            insert FinalListOfContactToInsert;
+        }
+        
+        // update contact
+        List<Contact> FinalListOfContactToUpdate = new List<Contact>();
+        Set<String> setOfCurrentContactCombinedDataForUpdate = new Set<String>();
+        
+        //loop through the passed data of contact for update and extract unique contacts for update
+        for(Contact objcontact :lstUpdateCon){
+            String strcombinedEventsAirAttendee = objcontact.FirstName + objcontact.LastName + objcontact.Email; 
+            strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
+            
+            // check if contact is exist or not
+            if(mapOfUniqueContactString.ContainsKey(strcombinedEventsAirAttendee)){
+                // for prevent adding duplicate contact in list
+                if(!setOfCurrentContactCombinedDataForUpdate.contains(strcombinedEventsAirAttendee)){
+                    FinalListOfContactToUpdate.add(objcontact);
+                    setOfCurrentContactCombinedDataForUpdate.add(strcombinedEventsAirAttendee);
+                }
+            }
+        }
+        
+        if(FinalListOfContactToUpdate.size()>0){
+            update FinalListOfContactToUpdate;
+        }
+        
     }
-
+    
     // Method for insert only new Leads if not exist in salesforce
-    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Map<String, Boolean> mapOfUniqueLeadString) {
-
+    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Map<String, Boolean> mapOfUniqueLeadString , List<Lead> lstUpdateLead) {
+        
         List<Lead> FinalListOfLeadToInsert = new List<Lead>();
         Set<String> setOfCurrentleadCombinedData = new Set<String>();
         
@@ -1022,6 +1079,28 @@ try{
         if(FinalListOfLeadToInsert.size()>0){
             insert FinalListOfLeadToInsert;
         } 
+        
+        // update lead
+        List<Lead> FinalListOfLeadToUpdate = new List<Lead>();
+        Set<String> setOfCurrentleadCombinedDataForUpdate = new Set<String>();
+        
+        for(Lead objLead :lstUpdateLead){
+            String strcombinedEventsAirAttendee= objLead.FirstName+objLead.LastName+objLead.Email; 
+            strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
+            
+            // check if lead exist or not
+            if(mapOfUniqueLeadString.ContainsKey(strcombinedEventsAirAttendee)){
+                // for prevent adding duplicate lead in list
+                if(!setOfCurrentleadCombinedDataForUpdate.contains(strcombinedEventsAirAttendee)){
+                    FinalListOfLeadToUpdate.add(objLead);
+                    setOfCurrentleadCombinedDataForUpdate.add(strcombinedEventsAirAttendee);
+                }
+            }
+        }
+        
+        if(FinalListOfLeadToUpdate.size()>0){
+            update FinalListOfLeadToUpdate;
+        }
     }
 
     // Method for insert only new Product_Service_Option if not exist in salesforce

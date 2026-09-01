@@ -42,6 +42,34 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             }
         }          
     }
+
+    private static Map<String, Object> getObjectMap(Object value) {
+        return value instanceof Map<String, Object> ? (Map<String, Object>) value : null;
+    }
+
+    private static List<Object> getObjectList(Object value) {
+        return value instanceof List<Object> ? (List<Object>) value : new List<Object>();
+    }
+
+    private static Decimal getDecimalValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        try {
+            return Decimal.valueOf(String.valueOf(value));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private static String getStringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static String getPricebookEntryKey(Id productId, Id pricebookId) {
+        return String.valueOf(productId) + ':' + String.valueOf(pricebookId);
+    }
     
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
         List<ResponseWrapper> lstofresponseWrapper = new List<ResponseWrapper>(); // List to hold the deserialized response
@@ -155,8 +183,12 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                 customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
                 if (eventCategory == 'Security') {
                     customVariables = ', "input": { "names": ["Industry SEC" , "Job Function SEC" , "Company Size"] }';
-                } else {
+                } else if (eventCategory == 'Integrate') {
                     customVariables = ', "input": { "names": ["Industry INT" , "Job Function INT" , "Company Size"] }';
+                }else if (eventCategory == 'Fire') {
+                    customVariables = ', "input": { "names": ["Industry FIRE" , "Job Function FIRE" , "Company Size"] }';
+                }else {
+                    customVariables = ', "input": { "names": ["Industry SEC" , "Job Function SEC" , "Company Size"] }';
                 }
             }
             
@@ -256,7 +288,10 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             if (eventmap != null && !eventData.isEmpty()) {
                 
                 // Query for existing pricebooks associated with the event
-                List<Pricebook2> lstPriceook = [SELECT Id FROM Pricebook2 WHERE Events__c =: sfeventId LIMIT 50000];
+                List<Pricebook2> lstPriceook = [SELECT Id FROM Pricebook2 WHERE
+                                                Events__c =: sfeventId AND 
+                                                Name LIKE '%Visitor%' 
+                                                LIMIT 50000];
                 
                 for (Event__c eventRec : eventData) {
                     
@@ -383,8 +418,8 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             if (lsteventsairfunReg != null && lsteventsairfunReg.size() > 0) {
                 for (Object objEventReg : lsteventsairfunReg) {
                     Map<String, Object> eventReg = (Map<String, Object>) objEventReg;
-                    Map<String, Object> paymentDetails = (Map<String, Object>) eventReg.get('paymentDetails');
-                    Decimal totalCharge = (Decimal) paymentDetails.get('totalChargeAmount');
+                    Map<String, Object> paymentDetails = getObjectMap(eventReg.get('paymentDetails'));
+                    Decimal totalCharge = paymentDetails == null ? null : getDecimalValue(paymentDetails.get('totalChargeAmount'));
                     
                     if (totalCharge != null && totalCharge > 0) {
                         hasPaidRegistration = true;
@@ -494,7 +529,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
         
         system.debug('@@setOfCombinedEventsAirAttendee--'+setOfCombinedEventsAirAttendee);
         // fetch contact from sf based on combined String
-        List<Contact> listOfAllContact = [SELECT Id, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c FROM Contact
+        List<Contact> listOfAllContact = [SELECT Id, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c, MailingCity, MailingCountry, MailingState, MailingStreet, MailingPostalCode FROM Contact
                                           WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueContactString = new Map<String, Boolean>();
         Map<String, Contact> mapOfUniqueContactStringToUpdate = new Map<String, Contact>();
@@ -507,7 +542,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
         system.debug('@@mapOfUniqueContactString--'+mapOfUniqueContactString);
         system.debug('@@mapOfUniqueContactStringToUpdate--'+mapOfUniqueContactStringToUpdate);
         // fetch Lead from sf based on combined String
-        List<Lead> listOfAllLead = [SELECT Id, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c FROM Lead
+        List<Lead> listOfAllLead = [SELECT Id, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c, PostalCode, State, Country, Street, City FROM Lead
                                     WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
         Map<String, Lead> mapOfUniqueLeadStringToUpdate = new Map<String, Lead>();
@@ -556,11 +591,11 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                 for(Object funReg : lsteventsairfunReg) {
                     
                     Map<String, Object> eventFunReg = (Map<String, Object>) funReg;
-                    Map<String, Object> eventFunregPaymentdetails = (Map<String, Object>) eventFunReg.get('paymentDetails');
-                    Decimal totalcharge = (Decimal) eventFunregPaymentdetails.get('totalChargeAmount');
+                    Map<String, Object> eventFunregPaymentdetails = getObjectMap(eventFunReg.get('paymentDetails'));
+                    Decimal totalcharge = eventFunregPaymentdetails == null ? null : getDecimalValue(eventFunregPaymentdetails.get('totalChargeAmount'));
                     
                     //create contact and account in salesforce if not exist for paid registartions
-                    if (totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString)) {
+                    if (totalcharge != null && totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString)) {
                         
                         // contact creation for paid function registrations
                         Contact objcon = new Contact();
@@ -574,20 +609,32 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT') {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
+
+                                    if (eventCategory == 'Security') {
+                                        if (FieldName =='Industry SEC') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function SEC'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    } else if (eventCategory == 'Integrate') {
+                                        if (FieldName =='Industry INT') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function INT'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    }else if (eventCategory == 'Fire') {
+                                        if (FieldName =='Industry FIRE') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function FIRE'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
                                     }
-                                    if (FieldName =='Industry SEC') {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
-                                    }
+                                    
                                     if(FieldName == 'Company Size'){
                                         objcon.Company_Size__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function INT'){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC'){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
                                     }
                                 }
                             }
@@ -652,10 +699,36 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                                 objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
                             }  
                         }
+
+                        
+                        Object eventconadress = eventconmap.get('primaryAddress');
+                        Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
+                        if(eventconAdressmap != null) {
+                            if(eventconAdressmap.get('city') != null){
+                                objcon.MailingCity = (String) eventconAdressmap.get('city');  
+                            }
+                            
+                            if(eventconAdressmap.get('country') != null){
+                                objcon.MailingCountry = (String) eventconAdressmap.get('country');
+                            }
+                            
+                            if(eventconAdressmap.get('line1') != null && eventconAdressmap.get('line2') != null  && eventconAdressmap.get('line3') != null){
+                                objcon.MailingStreet = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
+                                
+                            }
+                            if(eventconAdressmap.get('state') != null){
+                                objcon.MailingState = (String) eventconAdressmap.get('state'); 
+                            }
+                            if(eventconAdressmap.get('postCode') != null){
+                                String strPostalcode = (String) eventconAdressmap.get('postCode');                    
+                                // Store only the first 20 characters in the mailingpostalcode field
+                                objcon.MailingPostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
+                            }
+                        }
                         lstInsrtCon.add(objcon);
 
                     }
-                    else if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
+                    else if (totalcharge != null && totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
                         // update contact for paid function registration
                         Contact objCon = mapOfUniqueContactStringToUpdate.get(CombinedString);
 
@@ -677,25 +750,63 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT' && (objCon.Industry__c == null || objCon.Industry__c == '')) {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
+
+                                    if (eventCategory == 'Security') {
+                                        if (FieldName =='Industry SEC') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function SEC'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    } else if (eventCategory == 'Integrate') {
+                                        if (FieldName =='Industry INT') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function INT'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    }else if (eventCategory == 'Fire') {
+                                        if (FieldName =='Industry FIRE') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function FIRE'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
                                     }
-                                    if (FieldName =='Industry SEC' && (objCon.Industry__c == null || objCon.Industry__c == '')) {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Company Size' && (objCon.Company_Size__c == null || objCon.Company_Size__c == '')){
+                                    
+                                    if(FieldName == 'Company Size'){
                                         objcon.Company_Size__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function INT' && (objCon.Job_Function__c == null || objCon.Job_Function__c == '')){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC' && (objCon.Job_Function__c == null || objCon.Job_Function__c == '')){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
                                     }
                                 }
                             }
                         }
 
+                        if(objcon.MailingCity == null && objcon.MailingCountry == null && objcon.MailingState == null && objcon.MailingStreet == null && objcon.MailingPostalCode == null) {
+                            Object eventconadress = eventconmap.get('primaryAddress');
+                            Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
+                            if(eventconAdressmap != null) {
+                                if(eventconAdressmap.get('city') != null){
+                                    objcon.MailingCity = (String) eventconAdressmap.get('city');  
+                                }
+                                
+                                if(eventconAdressmap.get('country') != null){
+                                    objcon.MailingCountry = (String) eventconAdressmap.get('country');
+                                }
+                                
+                                if(eventconAdressmap.get('line1') != null && eventconAdressmap.get('line2') != null  && eventconAdressmap.get('line3') != null){
+                                    objcon.MailingStreet = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
+                                    
+                                }
+                                if(eventconAdressmap.get('state') != null){
+                                    objcon.MailingState = (String) eventconAdressmap.get('state'); 
+                                }
+                                if(eventconAdressmap.get('postCode') != null){
+                                    String strPostalcode = (String) eventconAdressmap.get('postCode');                    
+                                    // Store only the first 20 characters in the mailingpostalcode field
+                                    objcon.MailingPostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
+                                }
+                            }
+                        }
                         lstupdateCon.add(objCon);
 
                     } 
@@ -756,20 +867,32 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT') {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+
+                                    if (eventCategory == 'Security') {
+                                        if (FieldName =='Industry SEC') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function SEC'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    } else if (eventCategory == 'Integrate') {
+                                        if (FieldName =='Industry INT') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function INT'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    }else if (eventCategory == 'Fire') {
+                                        if (FieldName =='Industry FIRE') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function FIRE'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
                                     }
-                                    if (FieldName =='Industry SEC') {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
-                                    }
+                                    
                                     if(FieldName == 'Company Size'){
                                         newLead.Company_Size__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function INT'){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC'){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
                                     }
                                 }
                             }  
@@ -785,6 +908,31 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                             newLead.Company = 'Unknown';
                         }
                         newLead.Status = 'New';
+
+                        Object eventconadress = eventconmap.get('primaryAddress');
+                        Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
+                        if(eventconAdressmap != null) {
+                            if(eventconAdressmap.get('city') != null){
+                                newLead.City = (String) eventconAdressmap.get('city');  
+                            }
+                            
+                            if(eventconAdressmap.get('country') != null){
+                                newLead.Country = (String) eventconAdressmap.get('country');
+                            }
+                            
+                            if(eventconAdressmap.get('line1') != null && eventconAdressmap.get('line2') != null  && eventconAdressmap.get('line3') != null){
+                                newLead.Street = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
+                                
+                            }
+                            if(eventconAdressmap.get('state') != null){
+                                newLead.State = (String) eventconAdressmap.get('state'); 
+                            }
+                            if(eventconAdressmap.get('postCode') != null){
+                                String strPostalcode = (String) eventconAdressmap.get('postCode');                    
+                                // Store only the first 20 characters in the postalcode field
+                                newLead.PostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
+                            }
+                        }
                         lstInsrtLead.add(newLead);
 
                     }
@@ -810,21 +958,60 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT' && (newLead.Industry__c == null || newLead.Industry__c == '')) {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+
+                                    if (eventCategory == 'Security') {
+                                        if (FieldName =='Industry SEC') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function SEC'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    } else if (eventCategory == 'Integrate') {
+                                        if (FieldName =='Industry INT') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function INT'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    }else if (eventCategory == 'Fire') {
+                                        if (FieldName =='Industry FIRE') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function FIRE'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
                                     }
-                                    if (FieldName =='Industry SEC' && (newLead.Industry__c == null || newLead.Industry__c == '')) {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Company Size' && (newLead.Company_Size__c == null || newLead.Company_Size__c == '')){
+                                    
+                                    if(FieldName == 'Company Size'){
                                         newLead.Company_Size__c = (String) customFieldsMap.get('value');
                                     }
-                                    if(FieldName == 'Job Function INT' && (newLead.Job_Function__c == null || newLead.Job_Function__c == '')){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC' && (newLead.Job_Function__c == null || newLead.Job_Function__c == '')){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
+                                }
+                            }
+                        }
+
+                        if(newLead.City == null && newLead.Country == null && newLead.State == null && newLead.Street == null && newLead.PostalCode == null) {
+                            Object eventconadress = eventconmap.get('primaryAddress');
+                            Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
+                            if(eventconAdressmap != null) {
+                                if(eventconAdressmap.get('city') != null){
+                                    newLead.City = (String) eventconAdressmap.get('city');  
+                                }
+                                
+                                if(eventconAdressmap.get('country') != null){
+                                    newLead.Country = (String) eventconAdressmap.get('country');
+                                }
+                                
+                                if(eventconAdressmap.get('line1') != null && eventconAdressmap.get('line2') != null  && eventconAdressmap.get('line3') != null){
+                                    newLead.Street = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
+                                    
+                                }
+                                if(eventconAdressmap.get('state') != null){
+                                    newLead.State = (String) eventconAdressmap.get('state'); 
+                                }
+                                if(eventconAdressmap.get('postCode') != null){
+                                    String strPostalcode = (String) eventconAdressmap.get('postCode');                    
+                                    // Store only the first 20 characters in the postalcode field
+                                    newLead.PostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
                                 }
                             }
                         }
@@ -940,16 +1127,20 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                 for(Object objEventReg: lsteventsairfunReg) {
                     
                     Map<String, Object> eventReg = (Map<String, Object>)objEventReg;
-                    Map<String, Object> eventregtypemap = (Map<String, Object>) eventReg.get('feeType');
-                    Map<String, Object> eventregPaymentdetails = (Map<String, Object>) eventReg.get('paymentDetails');
+                    Map<String, Object> eventregtypemap = getObjectMap(eventReg.get('feeType'));
+                    Map<String, Object> eventregPaymentdetails = getObjectMap(eventReg.get('paymentDetails'));
                     String strRegDate = (String) eventReg.get('registrationDateTime'); 
-                    Decimal totalcharge = (Decimal)eventregPaymentdetails.get('totalChargeAmount');
+                    Decimal totalcharge = eventregPaymentdetails == null ? null : getDecimalValue(eventregPaymentdetails.get('totalChargeAmount'));
                     system.debug('totalcharge-->'+totalcharge);
-                    String strtickets = (String) eventReg.get('tickets');
-                    Map<String, Object> tempfunmap = (Map<String, Object>)(eventReg.get('function'));                                
+                    String strtickets = getStringValue(eventReg.get('tickets'));
+                    Map<String, Object> tempfunmap = getObjectMap(eventReg.get('function'));
                     String checkInDate = (String) eventReg.get('checkInDate');
                     String createdAtDate = (String) eventReg.get('createdAt');
                     String checkOutDate = (String) eventReg.get('checkOutDate'); 
+
+                    if(eventregtypemap == null || tempfunmap == null) {
+                        continue;
+                    }
                     
                     //Registartion field mapping start
                     Registration__c objreg = new Registration__c(); 
@@ -973,13 +1164,16 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                         objreg.CheckOutDate__c  = (Datetime) JSON.deserialize('"' + checkOutDate + '"', Datetime.class);                     
                     }
                     
-                    objreg.Number_of_Tickets__c = Decimal.valueOf(strtickets);
+                    Decimal numberOfTickets = getDecimalValue(strtickets);
+                    if(numberOfTickets != null) {
+                        objreg.Number_of_Tickets__c = numberOfTickets;
+                    }
                     objreg.EventsAir_Function_Id__c = (String) tempfunmap.get('id');
                     
                     if(Finalstring != null && Finalstring != '') {
                         
                         // connect contact with paid function registrations
-                        if( totalcharge > 0 && mapOfContactStringAndId.containsKey(Finalstring)) {
+                        if( totalcharge != null && totalcharge > 0 && mapOfContactStringAndId.containsKey(Finalstring)) {
                             objreg.Contact__c = mapOfContactStringAndId.get(Finalstring);
                         }else {
                             // connect contact if it is created before
@@ -1000,7 +1194,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                         //}
                     }  
 
-                    if(eventregPaymentdetails.get('paymentStatus') != null) {
+                    if(eventregPaymentdetails != null && eventregPaymentdetails.get('paymentStatus') != null) {
                         objreg.Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');                     
                     } 
 
@@ -1010,7 +1204,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                         }
                     }
                     // for paid function registration for create opportunity and it's opportunity products
-                    if(totalcharge > 0 && selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {   
+                    if(totalcharge != null && totalcharge > 0 && objreg.Registration_Type__c != null && selectedValuesMap.containsKey(objreg.Registration_Type__c.trim())) {   
                         // isexecuted = true;
                         system.debug('totalcharge'+totalcharge);
                         String OrganizationName;
@@ -1408,6 +1602,8 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
         //fetch pricebook
         List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId LIMIT 50000];
         List<Pricebook2> lstStandardPriceBook = [ SELECT Id FROM Pricebook2 WHERE isStandard = true LIMIT 1];
+        Id eventPricebookId = lstPriceook.isEmpty() ? null : lstPriceook[0].Id;
+        Id standardPricebookId = lstStandardPriceBook.isEmpty() ? null : lstStandardPriceBook[0].Id;
         
         for(Opportunity opp: allOpportunitiyList) {
             mapOfEventConAndSFOppId.put(opp.EventsAir_Contact_Id__c, opp.Id);
@@ -1426,9 +1622,14 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                 for(Object objEventReg: lsteventsairfunReg) {
                     
                     Map<String, Object> eventReg = (Map<String, Object>)objEventReg;
-                    Object eventfunregtype = eventReg.get('feeType');                    
-                    Map<String, Object> eventregtypemap = (Map<String, Object>)eventfunregtype;
+                    Map<String, Object> eventregtypemap = getObjectMap(eventReg.get('feeType'));
+                    if(eventregtypemap == null) {
+                        continue;
+                    }
                     String strRegTypeId = (String) eventregtypemap.get('id');
+                    if(String.isBlank(strRegTypeId)) {
+                        continue;
+                    }
                     
                     List<Object> lstfee;
                     string funregid = (String) eventReg.get('id');
@@ -1504,56 +1705,54 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                     
                     Map<String, Object> eventReg = (Map<String, Object>)objEventReg;
                     string funregid = (String) eventReg.get('id');
-                    Object eventfunregtype = eventReg.get('feeType');                    
-                    Map<String, Object> eventregtypemap = (Map<String, Object>)eventfunregtype;
+                    Map<String, Object> eventregtypemap = getObjectMap(eventReg.get('feeType'));
+                    if(eventregtypemap == null) {
+                        continue;
+                    }
                     String strRegTypeId = (String) eventregtypemap.get('id');
-                    List<Object> lstfee = (List<Object>) eventregtypemap.get('fees'); 
+                    if(String.isBlank(strRegTypeId)) {
+                        continue;
+                    }
+                    List<Object> lstfee = getObjectList(eventregtypemap.get('fees'));
                     
                     if(lstfee.size() > 0){
                         // loop through eventsAir fee Data for creation of Pricebook entry
                         for(Object objfee: lstfee) {
                             
-                            Map<String, Object> feemap = (Map<String, Object>)objfee;
+                            Map<String, Object> feemap = getObjectMap(objfee);
+                            Decimal feeAmount = feemap == null ? null : getDecimalValue(feemap.get('amount'));
+                            if(feeAmount == null) {
+                                continue;
+                            }
                             
                             // check for eventsAir strRegTypeId (Product Events Air Id) for prevent duplicate for pricebookEntry
                             if(mapOfEvnproandSfId.containsKey(strRegTypeId) && !setofProductId.contains(strRegTypeId)) {
                                 
                                 //add to standard pricebook
-                                PricebookEntry pbEntry = new PricebookEntry();
-                                pbEntry.Product2Id = mapOfEvnproandSfId.get(strRegTypeId);
-                                
-                                if(lstStandardPriceBook.size() > 0){
-                                    pbEntry.Pricebook2Id = lstStandardPriceBook[0].Id;  
-                                }
-                                
-                                pbEntry.UnitPrice = (decimal) feemap.get('amount');
-                                pbEntry.IsActive = true;
-                                pbEntry.UseStandardPrice = false;
-                                if(strRegTypeId != null) {
+                                if(standardPricebookId != null) {
+                                    PricebookEntry pbEntry = new PricebookEntry();
+                                    pbEntry.Product2Id = mapOfEvnproandSfId.get(strRegTypeId);
+                                    pbEntry.Pricebook2Id = standardPricebookId;
+                                    pbEntry.UnitPrice = feeAmount;
+                                    pbEntry.IsActive = true;
+                                    pbEntry.UseStandardPrice = false;
                                     pbEntry.EventsAir_Type_ID__c = strRegTypeId;
-                                } 
-                                system.debug(' pricebook'+pbEntry);
-                                lstInsertPricebookEntry.add(pbEntry); 
+                                    system.debug(' pricebook'+pbEntry);
+                                    lstInsertPricebookEntry.add(pbEntry);
+                                }
                                 
                                 //add to custom pricebook
-                                PricebookEntry pbEntry2 = new PricebookEntry();
-                                
-                                if(mapOfEvnproandSfId.containsKey(strRegTypeId)){
-                                    pbEntry2.Product2Id = mapOfEvnproandSfId.get(strRegTypeId);                         
-                                }
-                                
-                                if(lstPriceook.size()>0){
-                                    pbEntry2.Pricebook2Id = lstPriceook[0].Id; 
-                                }  
-                                
-                                if(strRegTypeId != null) {
+                                if(eventPricebookId != null) {
+                                    PricebookEntry pbEntry2 = new PricebookEntry();
+                                    pbEntry2.Product2Id = mapOfEvnproandSfId.get(strRegTypeId);
+                                    pbEntry2.Pricebook2Id = eventPricebookId;
                                     pbEntry2.EventsAir_Type_ID__c = strRegTypeId;
-                                }  
-                                pbEntry2.UnitPrice = (decimal) feemap.get('amount');
-                                pbEntry2.IsActive = true;
-                                pbEntry2.UseStandardPrice = false;
+                                    pbEntry2.UnitPrice = feeAmount;
+                                    pbEntry2.IsActive = true;
+                                    pbEntry2.UseStandardPrice = false;
+                                    lstInsertPricebookEntry.add(pbEntry2);
+                                }
                                 setofProductId.add(strRegTypeId);
-                                lstInsertPricebookEntry.add(pbEntry2); 
                                 
                                 system.debug(' mapOfEvnproandSfId'+mapOfEvnproandSfId);
                                 system.debug(' strRegTypeId'+strRegTypeId);
@@ -1568,25 +1767,31 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
         if(!lstInsertPricebookEntry.isEmpty()) {
             
             //check for existing pricebookentry start
-            Set<String> setOfPBEntryRegTypeIds = new Set<String>();
+            Set<Id> setOfPBEntryProductIds = new Set<Id>();
+            Set<Id> setOfPBEntryPricebookIds = new Set<Id>();
             for (PricebookEntry newpricebookentry : lstInsertPricebookEntry) {
-                setOfPBEntryRegTypeIds.add(newpricebookentry.EventsAir_Type_ID__c);
+                if(newpricebookentry.Product2Id != null && newpricebookentry.Pricebook2Id != null) {
+                    setOfPBEntryProductIds.add(newpricebookentry.Product2Id);
+                    setOfPBEntryPricebookIds.add(newpricebookentry.Pricebook2Id);
+                }
             }
-            List<PricebookEntry> lstexistingPricebookentry = [SELECT Id, Name, Product2.Name, EventsAir_Type_ID__c, UnitPrice
+            List<PricebookEntry> lstexistingPricebookentry = [SELECT Id, Name, Product2Id, Pricebook2Id, Product2.Name, EventsAir_Type_ID__c, UnitPrice
                                                               FROM PricebookEntry 
-                                                              WHERE Pricebook2.isStandard = false AND EventsAir_Type_ID__c IN: setOfPBEntryRegTypeIds LIMIT 50000];
+                                                              WHERE Product2Id IN: setOfPBEntryProductIds AND Pricebook2Id IN: setOfPBEntryPricebookIds LIMIT 50000];
             
             Map<String, Boolean> mapofpricebookentry = new Map<String, Boolean>();
             
             for(PricebookEntry pb: lstexistingPricebookentry) {
-                mapofpricebookentry.put(pb.EventsAir_Type_ID__c, true);
+                mapofpricebookentry.put(getPricebookEntryKey(pb.Product2Id, pb.Pricebook2Id), true);
             }
             
             List<PricebookEntry> finallsttoinsrtPB = new List<PricebookEntry>();
             
             for(PricebookEntry objPB: lstInsertPricebookEntry) {
-                if(!mapofpricebookentry.containsKey(objPB.EventsAir_Type_ID__c)) {
+                String pbKey = getPricebookEntryKey(objPB.Product2Id, objPB.Pricebook2Id);
+                if(objPB.Product2Id != null && objPB.Pricebook2Id != null && !mapofpricebookentry.containsKey(pbKey)) {
                     finallsttoinsrtPB.add(objPB);
+                    mapofpricebookentry.put(pbKey, true);
                 }
             }
             
@@ -1598,7 +1803,9 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             //fill mapOfEventRegTypeIdAndSFPBentryId Map
             //loop through pricebookentry list
             for(PricebookEntry objexistingPBEntry: lstexistingPricebookentry) {
-                mapOfEventRegTypeIdAndSFPBentryId.put(objexistingPBEntry.EventsAir_Type_ID__c, objexistingPBEntry.Id);
+                if(objexistingPBEntry.Pricebook2Id == eventPricebookId && objexistingPBEntry.EventsAir_Type_ID__c != null) {
+                    mapOfEventRegTypeIdAndSFPBentryId.put(objexistingPBEntry.EventsAir_Type_ID__c, objexistingPBEntry.Id);
+                }
             }  
         }  
         
@@ -1617,18 +1824,26 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                     
                     Map<String, Object> eventReg = (Map<String, Object>)objEventReg;
                     string funregid = (String) eventReg.get('id');
-                    Object eventregPaydetail = eventReg.get('paymentDetails');                    
-                    Object eventfunregtype = eventReg.get('feeType');                    
+                    Map<String, Object> eventregPaymentdetails = getObjectMap(eventReg.get('paymentDetails'));
+                    Map<String, Object> eventregtypemap = getObjectMap(eventReg.get('feeType'));
                     
-                    Map<String, Object> eventregPaymentdetails = (Map<String, Object>)eventregPaydetail;
-                    Decimal totalcharge = (Decimal)eventregPaymentdetails.get('totalChargeAmount');
+                    if(eventregPaymentdetails == null || eventregtypemap == null) {
+                        continue;
+                    }
+
+                    Decimal totalcharge = getDecimalValue(eventregPaymentdetails.get('totalChargeAmount'));
                     
-                    Map<String, Object> eventregtypemap = (Map<String, Object>)eventfunregtype;
                     String strRegTypeId = (String) eventregtypemap.get('id');
+                    if(String.isBlank(strRegTypeId)) {
+                        continue;
+                    }
                     
                     String discountcodeval;
                     Map<String, Object> eventregPaydetailcodedetail;
-                    String strtickets = (String) eventReg.get('tickets');
+                    Decimal ticketQuantity = getDecimalValue(eventReg.get('tickets'));
+                    if(ticketQuantity == null) {
+                        ticketQuantity = 1;
+                    }
                     
                     // check for function registration payment details
                     if(eventregPaymentdetails.get('discountCode') != null){
@@ -1643,7 +1858,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                     }
                     
                     // check for paid function registration
-                    if(totalcharge > 0){
+                    if(totalcharge != null && totalcharge > 0){
                         
                         system.debug('totalcharge'+totalcharge);
                         //  " mapOfEventConAndSFOppId " check if the contact with eventsAir ID is exist or not in salesforce
@@ -1657,16 +1872,16 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                             OpportunityLineItem oli = new OpportunityLineItem();
                             oli.OpportunityId = mapOfEventConAndSFOppId.get(strevntconId);                    
                             oli.PricebookEntryId = mapOfEventRegTypeIdAndSFPBentryId.get(strRegTypeId);
-                            oli.Quantity = Integer.valueOf(strtickets);
+                            oli.Quantity = ticketQuantity;
                             oli.Product2Id =mapOfEvnproandSfId.get(strRegTypeId); 
-                            oli.EventsAir_Adjustment__c = (Decimal) eventregPaymentdetails.get('adjustmentAmount');
-                            oli.EventsAir_Discount_Amount__c = (Decimal) eventregPaymentdetails.get('discountAmount');
+                            oli.EventsAir_Adjustment__c = getDecimalValue(eventregPaymentdetails.get('adjustmentAmount'));
+                            oli.EventsAir_Discount_Amount__c = getDecimalValue(eventregPaymentdetails.get('discountAmount'));
                             
                             if(discountcodeval != null){
                                 oli.EventsAir_Discount_Code__c = discountcodeval;  
                             }
                             
-                            oli.EventsAir_Tax__c = (Decimal) eventregPaymentdetails.get('taxAmount');
+                            oli.EventsAir_Tax__c = getDecimalValue(eventregPaymentdetails.get('taxAmount'));
                             oli.EventsAir_Payment_Status__c = (String) eventregPaymentdetails.get('paymentStatus');
                             oli.Function_Registration_Id__c = funregid;
                             // oli.EventsAir_Regisration_ID__c = funregid;
@@ -1677,7 +1892,7 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
                                     oli.Contact__c = mapOfContactStringAndId.get(Finalstring);
                                 }
                             }    
-                            oli.TotalPrice = (Decimal) eventregPaymentdetails.get('totalChargeAmount');
+                            oli.TotalPrice = totalcharge;
                             System.debug('@@@ eventregPaymentdetails = '+eventregPaymentdetails);
                             system.debug('oli'+oli);
                             lstInsertOppProduct.add(oli);
@@ -1806,8 +2021,12 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
         //loop through event'sair function registration data for setup function start
         for(Object objEventReg: lstobject) {            
             Map<String, Object> eventReg = (Map<String, Object>)objEventReg;            
-            Map<String, Object> tempfunmap = (Map<String, Object>)(eventReg.get('function'));            
-            Map<String, Object> eventregtypemap = (Map<String, Object>) eventReg.get('feeType');
+            Map<String, Object> tempfunmap = getObjectMap(eventReg.get('function'));            
+            Map<String, Object> eventregtypemap = getObjectMap(eventReg.get('feeType'));
+
+            if(tempfunmap == null || eventregtypemap == null) {
+                continue;
+            }
 
             if(String.isNotBlank(eventData[0].Function_Registration_Types__c) && eventregtypemap.get('name') != null && selectedValuesMap.containsKey((String) eventregtypemap.get('name'))) {          
                 listOfFunctioninfomap.add(tempfunmap);            
@@ -1866,6 +2085,9 @@ public class ImportFunRegSeprateSecAndInteLiveBatch implements Database.Batchabl
             } 
             
             String strFunName = (string)mapOfFunction.get('name');
+            if(String.isBlank(strFunName)) {
+                continue;
+            }
             if(strFunName.length() <= 80) {
                 func.Name = strFunName;    
             } else {

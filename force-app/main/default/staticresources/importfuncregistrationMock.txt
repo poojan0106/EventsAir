@@ -499,9 +499,23 @@
                ]
             },
             {
-               "customFields":[
-                  
-               ],
+                "customFields":[
+                    {
+                       "name":"Industry INT",
+                       "definitionId":"D1658AB1-C034-4429-8B40-D5CFD01387FB",
+                       "value":"Consultant"
+                    },
+                    {
+                       "name":"Company Size",
+                       "definitionId":"D30BE3F5-69A6-485B-BF03-BDA224BF06C8",
+                       "value":"500+"
+                    },
+                    {
+                       "name":"Job Function INT",
+                       "definitionId":"5A263685-76F8-4E0A-BBEF-21AA3E28126F",
+                       "value":"Consultant"
+                    }
+                 ],
                "marketingRecords":[
                   {
                      "id":"9F2E682F-CF2D-4D7E-B557-00992A8B99E3",
@@ -517,6 +531,7 @@
                "lastName":"Aakesson",
                "firstName":"Joachim",
                "title":"He/Him",
+               "jobTitle":"Audio Visual Specialist",
                "organizationName":"Ace Well Technology",
                "checkInDate":"2024-03-13T07:25:24.557Z",
                "checkOutDate":null,
@@ -539,7 +554,7 @@
                      "checkOutDate":"2024-04-13T08:10:06.222Z",
                      "feeType":{
                         "id":"36CD501D-295F-413C-9405-D98ED8892A3D",
-                        "name":"Opening Party",
+                        "name":"1 x Session Pass",
                         "uniqueCode":null,
                         "fees":[
                            {
@@ -549,7 +564,7 @@
                      },
                      "function":{
                         "id":"FDF99D9A-9D55-4B4E-A068-E195DF2E60D7",
-                        "name":"Opening Party",
+                        "name":"1 x Session Pass",
                         "start":"17:00",
                         "date":"2024-03-13",
                         "end":"19:00",
@@ -566,54 +581,26 @@
                            "code":"A024"
                         }
                      }
-                  },
-                  {
-                     "id":"BB451254-1058-4E24-8248-F3C73B1D1535",
-                     "tickets":1,
-                     "checkInDate":"2024-03-13T08:10:06.300Z",
-                     "checkOutDate":null,
-                     "feeType":{
-                        "id":"36CD501D-295F-413C-9405-D98ED8892A3D",
-                        "name":"Opening Party",
-                        "uniqueCode":null,
-                        "fees":[
-                           {
-                              "amount":110
-                           }
-                        ]
-                     },
-                     "function":{
-                        "id":"FDF99D9A-9D55-4B4E-A068-E195DF2E60D7",
-                        "name":"Opening Party",
-                        "start":"17:00",
-                        "date":"2024-03-13",
-                        "end":"19:00",
-                        "overview":null,
-                        "details":"The official Opening Party will be held after day one of AOG Energy. This is your opportunity to connect with leaders of the industry, colleagues, and clients in a relaxed garden party setting. Don’t miss the entertainment, food, and drinks. The more the merrier!"
-                     },
-                     "paymentDetails":{
-                        "paymentStatus":"PURCHASE",
-                        "discountAmount":0,
-                        "adjustmentAmount":0,
-                        "taxAmount":0,
-                        "totalChargeAmount":0,
-                        "discountCode":null
-                     }
                   }
                ]
             },
             {
                "customFields":[
                   {
-                     "name":"Job Function",
+                     "name":"Job Function INT",
                      "definitionId":"D7ACADD2-CF2A-4C54-B57E-D64C4D519D3E",
                      "value":"Geologist"
                   },
                   {
-                     "name":"Industry",
-                     "definitionId":"6DEDE8D6-5A15-41C0-A597-FE31725B557E",
-                     "value":"Renewable Energy"
-                  }
+                    "name":"Company Size",
+                    "definitionId":"D30BE3F5-69A6-485B-BF03-BDA224BF06C8",
+                    "value":"500+"
+                 },
+                 {
+                    "name":"Industry INT",
+                    "definitionId":"6DEDE8D6-5A15-41C0-A597-FE31725B557E",
+                    "value":"Renewable Energy"
+                 }
                ],
                "marketingRecords":[
                   {
@@ -666,6 +653,7 @@
                "lastName":"Aase",
                "firstName":"Anna",
                "title":"",
+               "jobTitle":"Audio Visual Specialist",
                "organizationName":"DOF Subsea",
                "checkInDate":"2024-03-14T04:26:03.909Z",
                "checkOutDate":null,
@@ -681,7 +669,39 @@
                },
                "contactPhoneNumbers":null,
                "functionRegistrations":[
-                  
+                {
+                    "id":"BB451254-1058-4E24-8248-F3C73B1D1535",
+                    "tickets":1,
+                    "checkInDate":"2024-03-13T08:10:06.300Z",
+                    "checkOutDate":null,
+                    "feeType":{
+                       "id":"36CD501D-295F-413C-9405-D98ED8892A3D",
+                       "name":"1 x Session Pass",
+                       "uniqueCode":null,
+                       "fees":[
+                          {
+                             "amount":110
+                          }
+                       ]
+                    },
+                    "function":{
+                       "id":"FDF99D9A-9D55-4B4E-A068-E195DF2E60D7",
+                       "name":"1 x Session Pass",
+                       "start":"17:00",
+                       "date":"2024-03-13",
+                       "end":"19:00",
+                       "overview":null,
+                       "details":"The official Opening Party will be held after day one of AOG Energy. This is your opportunity to connect with leaders of the industry, colleagues, and clients in a relaxed garden party setting. Don’t miss the entertainment, food, and drinks. The more the merrier!"
+                    },
+                    "paymentDetails":{
+                       "paymentStatus":"PURCHASE",
+                       "discountAmount":0,
+                       "adjustmentAmount":0,
+                       "taxAmount":0,
+                       "totalChargeAmount":0,
+                       "discountCode":null
+                    }
+                 }
                ]
             },
             {
@@ -859,12 +879,17 @@
             {
                "customFields":[
                   {
-                     "name":"Job Function",
+                     "name":"Job Function INT",
                      "definitionId":"D7ACADD2-CF2A-4C54-B57E-D64C4D519D3E",
                      "value":"Engineer - Mechanical"
                   },
                   {
-                     "name":"Industry",
+                    "name":"Company Size",
+                    "definitionId":"D30BE3F5-69A6-485B-BF03-BDA224BF06C8",
+                    "value":"500+"
+                 },
+                  {
+                     "name":"Industry INT",
                      "definitionId":"6DEDE8D6-5A15-41C0-A597-FE31725B557E",
                      "value":"Engineering"
                   }
@@ -911,6 +936,7 @@
                "lastName":"Abbasi",
                "firstName":"Asfand Fida",
                "title":"",
+               "jobTitle":"Engineer",
                "organizationName":"Velosi Integrity And Safety Pakistan Pvt. Ltd",
                "checkInDate":null,
                "checkOutDate":null,
@@ -926,7 +952,40 @@
                },
                "contactPhoneNumbers":null,
                "functionRegistrations":[
-                  
+                {
+                    "id":"DC0C0280-8038-42E3-9CBA-5B1DFC0E1F9C",
+                    "tickets":1,
+                    "checkInDate":null,
+                    "checkOutDate":null,
+                    "createdAt":"2025-04-23T04:37:21.817Z",
+                    "feeType":{
+                       "id":"584D005F-F905-4ADC-B8FE-611A295019A9",
+                       "name":"K-12 Conference Pass (Member)",
+                       "uniqueCode":null,
+                       "fees":[
+                          {
+                             "amount":0
+                          }
+                       ]
+                    },
+                    "function":{
+                       "id":"F0C4C5B7-C89D-4959-A14F-3454FAE49CEC",
+                       "name":"K-12 Conference",
+                       "start":"08:30",
+                       "date":"2025-08-27",
+                       "end":"12:00",
+                       "overview":null,
+                       "details":"The K-12 Conference, presented by AETM and Integrate, is returning in 2025. Join us on the morning of August 27, before the main show floor opens, for an in-depth exploration of current AV education technologies and their applications in improving classroom learning and student engagement. N.B. This event is free for AETM members."
+                    },
+                    "paymentDetails":{
+                       "paymentStatus":"INCLUSIVE",
+                       "discountAmount":0,
+                       "adjustmentAmount":0,
+                       "taxAmount":0,
+                       "totalChargeAmount":0,
+                       "discountCode":null
+                    }
+                 }
                ]
             },
             {

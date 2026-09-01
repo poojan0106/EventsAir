@@ -243,10 +243,7 @@ public class ImportRegistartionForAllEventsBatch implements Database.Batchable<R
                  Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
                    system.debug('@@eventconAdressmap'+eventconAdressmap);
                    if(eventconAdressmap != null) {
-                    objcon.MailingCity = (String) eventconAdressmap.get('city');
                     objcon.MailingCountry = (String) eventconAdressmap.get('country');
-                    objcon.MailingStreet = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
-                     objcon.MailingPostalCode = (String) eventconAdressmap.get('postCode');
                     objcon.MailingState = (String) eventconAdressmap.get('state');
                      
                 } 
@@ -294,12 +291,7 @@ public class ImportRegistartionForAllEventsBatch implements Database.Batchable<R
                  Map<String, Object> eventleadAdressmap = (Map<String, Object>) eventleadadress;
                    system.debug('@@eventleadAdressmap'+eventleadAdressmap);
                    if(eventleadAdressmap != null) {
-                    newLead.City = (String) eventleadAdressmap.get('city');
                     newLead.Country = (String) eventleadAdressmap.get('country');
-                    newLead.Street = (String) eventleadAdressmap.get('line1')+ ' '+(String) eventleadAdressmap.get('line2')+' '+(String) eventleadAdressmap.get('line3');
-                    //newLead.MailingStreet = (String) eventleadAdressmap.get('line2');
-                   // newLead.MailingStreet = (String) eventleadAdressmap.get('line3');
-                    newLead.PostalCode = (String) eventleadAdressmap.get('postCode');
                     newLead.State = (String) eventleadAdressmap.get('state');
                      
                 } 

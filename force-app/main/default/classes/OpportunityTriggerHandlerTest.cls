@@ -968,4 +968,184 @@ private class OpportunityTriggerHandlerTest {
 		System.assert(result.isSuccess() == true);
 		System.assertEquals(1, relatedSegmentOnOpp.size());
 	}
+
+	/************************************************************************************************************
+	* @description  : Test that a rebook opportunity is moved back to Prospecting when the account's
+	*                 primary segment has an inactive Segment Option
+	* @author       : Salesfix - CI
+	* @date         : 2024-06-04
+	*************************************************************************************************************/
+	@isTest
+	private static void addPrimarySegmentToNewOpp_InactiveSegment_Test() {
+		Id digitalEventRTId = Schema.SObjectType.Event__c.getRecordTypeInfosByName().get('Digital').getRecordTypeId();
+		Id tradeShowRTId = Schema.SObjectType.Event__c.getRecordTypeInfosByName().get('Trade Show').getRecordTypeId();
+		Id contractorId = [SELECT Id FROM Account WHERE Name = 'Ray Contractor' LIMIT 1].Id;
+		Date today = system.today();
+
+		Pricebook2 technologyEventPriceBook = new Pricebook2(
+			Id = Test.getStandardPricebookId(),
+			IsActive = true
+		);
+		update technologyEventPriceBook;
+
+		Event__c nextEvt = new Event__c();
+		nextEvt.RecordTypeId = tradeShowRTId;
+		nextEvt.Event_Portfolio__c = 'Technology';
+		nextEvt.Active__c = false;
+		nextEvt.Event_Category__c = 'Integrate';
+		nextEvt.Name = 'Next Event Technology Integrate Event 2';
+		nextEvt.Price_Book__c = technologyEventPriceBook.Id;
+		nextEvt.Event_Code__c = '9999';
+		nextEvt.Close_Date__c = today.addYears(1);
+		nextEvt.Cooling_Off_Date__c = today.addYears(1);
+		nextEvt.Contractor__c = contractorId;
+		insert nextEvt;
+
+		Event__c currentEvt = new Event__c();
+		currentEvt.RecordTypeId = digitalEventRTId;
+		currentEvt.Event_Portfolio__c = 'Technology';
+		currentEvt.Active__c = true;
+		currentEvt.Event_Category__c = 'Integrate';
+		currentEvt.Name = 'Technology Integrate Event 2';
+		currentEvt.Price_Book__c = technologyEventPriceBook.Id;
+		currentEvt.Event_Code__c = '9999';
+		currentEvt.Next_Event__c = nextEvt.Id;
+		insert currentEvt;
+
+		Account acc = new Account();
+		acc.Website = 'testWebsite';
+		acc.Name = 'testInactiveSegmentAccount';
+		acc.Industry = 'Technology';
+		acc.Phone = '12345';
+		acc.BillingCity = 'Sydney';
+		acc.BillingPostalCode = '9000';
+		acc.BillingStreet = 'testStreet';
+		acc.BillingCountry = 'Australia';
+		acc.BillingState = 'New South Wales';
+		insert acc;
+
+		// Create segment option as active first to pass field filter, then deactivate
+		Segment_Option__c inactiveSegmentOption = new Segment_Option__c();
+		inactiveSegmentOption.Name = 'Inactive Option';
+		inactiveSegmentOption.Event_Category__c = 'Integrate';
+		inactiveSegmentOption.Active__c = true;
+		insert inactiveSegmentOption;
+
+		// Attach segment to account while still active
+		Relevant_Segment__c inactiveSegment = new Relevant_Segment__c();
+		inactiveSegment.Segment_Option__c = inactiveSegmentOption.Id;
+		inactiveSegment.Primary_Segment__c = true;
+		inactiveSegment.Account__c = acc.Id;
+		insert inactiveSegment;
+
+		// Now deactivate the segment option
+		inactiveSegmentOption.Active__c = false;
+		update inactiveSegmentOption;
+
+		Test.startTest();
+
+		Opportunity opp = new Opportunity();
+		opp.AccountId = acc.Id;
+		opp.Event__c = currentEvt.Id;
+		opp.Name = 'testInactiveSegmentOpp';
+		opp.StageName = Label.Opportunity_Stage_Negotiation;
+		opp.CloseDate = date.today() + 10;
+		insert opp;
+
+		Test.stopTest();
+
+		Opportunity insertedOpp = [SELECT Id, StageName, NextStep FROM Opportunity WHERE Id = :opp.Id];
+
+		// Opportunity should be moved back to Prospecting
+		System.assertEquals(Label.Opportunity_Stage_Prospecting, insertedOpp.StageName, 'Opportunity should be moved back to Prospecting when segment is inactive');
+
+		// NextStep should contain the guidance message
+		System.assert(insertedOpp.NextStep != null, 'NextStep should be populated with guidance');
+		System.assert(insertedOpp.NextStep.contains('no active primary segment'), 'NextStep should mention inactive segment reason');
+
+		// No segment should have been copied to the opportunity
+		List<Relevant_Segment__c> oppSegments = [SELECT Id FROM Relevant_Segment__c WHERE Opportunity__c = :opp.Id];
+		System.assertEquals(0, oppSegments.size(), 'No segment should be copied when segment option is inactive');
+	}
+
+	/************************************************************************************************************
+	* @description  : Test that a rebook opportunity is moved back to Prospecting when the account
+	*                 has no primary segment at all
+	* @author       : Salesfix - CI
+	* @date         : 2024-06-04
+	*************************************************************************************************************/
+	@isTest
+	private static void addPrimarySegmentToNewOpp_NoSegment_Test() {
+		Id digitalEventRTId = Schema.SObjectType.Event__c.getRecordTypeInfosByName().get('Digital').getRecordTypeId();
+		Id tradeShowRTId = Schema.SObjectType.Event__c.getRecordTypeInfosByName().get('Trade Show').getRecordTypeId();
+		Id contractorId = [SELECT Id FROM Account WHERE Name = 'Ray Contractor' LIMIT 1].Id;
+		Date today = system.today();
+
+		Pricebook2 technologyEventPriceBook = new Pricebook2(
+			Id = Test.getStandardPricebookId(),
+			IsActive = true
+		);
+		update technologyEventPriceBook;
+
+		Event__c nextEvt = new Event__c();
+		nextEvt.RecordTypeId = tradeShowRTId;
+		nextEvt.Event_Portfolio__c = 'Technology';
+		nextEvt.Active__c = false;
+		nextEvt.Event_Category__c = 'Integrate';
+		nextEvt.Name = 'Next Event Technology Integrate Event 3';
+		nextEvt.Price_Book__c = technologyEventPriceBook.Id;
+		nextEvt.Event_Code__c = '8888';
+		nextEvt.Close_Date__c = today.addYears(1);
+		nextEvt.Cooling_Off_Date__c = today.addYears(1);
+		nextEvt.Contractor__c = contractorId;
+		insert nextEvt;
+
+		Event__c currentEvt = new Event__c();
+		currentEvt.RecordTypeId = digitalEventRTId;
+		currentEvt.Event_Portfolio__c = 'Technology';
+		currentEvt.Active__c = true;
+		currentEvt.Event_Category__c = 'Integrate';
+		currentEvt.Name = 'Technology Integrate Event 3';
+		currentEvt.Price_Book__c = technologyEventPriceBook.Id;
+		currentEvt.Event_Code__c = '8888';
+		currentEvt.Next_Event__c = nextEvt.Id;
+		insert currentEvt;
+
+		// Account with no segments at all
+		Account acc = new Account();
+		acc.Website = 'testWebsite';
+		acc.Name = 'testNoSegmentAccount';
+		acc.Industry = 'Technology';
+		acc.Phone = '12345';
+		acc.BillingCity = 'Sydney';
+		acc.BillingPostalCode = '9000';
+		acc.BillingStreet = 'testStreet';
+		acc.BillingCountry = 'Australia';
+		acc.BillingState = 'New South Wales';
+		insert acc;
+
+		Test.startTest();
+
+		Opportunity opp = new Opportunity();
+		opp.AccountId = acc.Id;
+		opp.Event__c = currentEvt.Id;
+		opp.Name = 'testNoSegmentOpp';
+		opp.StageName = Label.Opportunity_Stage_Negotiation;
+		opp.CloseDate = date.today() + 10;
+		insert opp;
+
+		Test.stopTest();
+
+		Opportunity insertedOpp = [SELECT Id, StageName, NextStep FROM Opportunity WHERE Id = :opp.Id];
+
+		// Opportunity should be moved back to Prospecting
+		System.assertEquals(Label.Opportunity_Stage_Prospecting, insertedOpp.StageName, 'Opportunity should be moved back to Prospecting when account has no segment');
+
+		// NextStep should contain the guidance message
+		System.assert(insertedOpp.NextStep != null, 'NextStep should be populated with guidance');
+
+		// No segment should exist on the opportunity
+		List<Relevant_Segment__c> oppSegments = [SELECT Id FROM Relevant_Segment__c WHERE Opportunity__c = :opp.Id];
+		System.assertEquals(0, oppSegments.size(), 'No segment should exist when account has no segment');
+	}
 }

@@ -1202,8 +1202,8 @@ newOpportunity.StageName != Label.Opportunity_Stage_Cooling_Off && newOpportunit
 
                     String body = '<html>'+ cornerWrapper.openCorners+' Open Corners not found for Stand : ';
 
-                    body +='<a href="'+URL.getSalesforceBaseUrl().toExternalForm()+'/'+cornerWrapper.standId+'">'+cornerWrapper.standName+'</a> for Opportunity : ';
-                    body +='<a href="'+URL.getSalesforceBaseUrl().toExternalForm()+'/'+cornerWrapper.opporutnityId+'">'+cornerWrapper.opportunityName+'</a> </html>';
+                    body +='<a href="'+URL.getOrgDomainUrl().toExternalForm()+'/'+cornerWrapper.standId+'">'+cornerWrapper.standName+'</a> for Opportunity : ';
+                    body +='<a href="'+URL.getOrgDomainUrl().toExternalForm()+'/'+cornerWrapper.opporutnityId+'">'+cornerWrapper.opportunityName+'</a> </html>';
                     email.setHtmlBody(body);
 
                     masterListMails.add(email);
@@ -1465,7 +1465,8 @@ newOpportunity.StageName != Label.Opportunity_Stage_Cooling_Off && newOpportunit
                        Segment_Option__c 
                 FROM Relevant_Segment__c 
                 WHERE Account__c IN :accountIds AND 
-                      Primary_Segment__c = true
+                      Primary_Segment__c = true AND
+                      Segment_Option__r.Active__c = true
             ]) {
                 if (!primarySegmentsByAccountId.containsKey(relevantPrimarySegment.Account__c)) {
                     primarySegmentsByAccountId.put(relevantPrimarySegment.Account__c, new List<Relevant_Segment__c> { relevantPrimarySegment });
@@ -1476,10 +1477,12 @@ newOpportunity.StageName != Label.Opportunity_Stage_Cooling_Off && newOpportunit
             }
 
             List<Relevant_Segment__c> primarySegmentsForInsert = new List<Relevant_Segment__c>();
+            List<Opportunity> oppsToMoveBack = new List<Opportunity>();
 
             for (Opportunity opp : newOpportunityList) {
                 if (opp.AccountId != null) {
                     System.debug('got accountId');
+                    Boolean segmentFound = false;
 
                     if (primarySegmentsByAccountId.containsKey(opp.AccountId)) {
                         System.debug('got primary relevant segments');
@@ -1495,14 +1498,26 @@ newOpportunity.StageName != Label.Opportunity_Stage_Cooling_Off && newOpportunit
                                 cloneSegment.Primary_Segment__c = true;
 
                                 primarySegmentsForInsert.add(cloneSegment);
-
+                                segmentFound = true;
                             }
                         }
+                    }
+
+                    if (!segmentFound && opp.StageName == Label.Opportunity_Stage_Negotiation) {
+                        oppsToMoveBack.add(new Opportunity(
+                            Id = opp.Id,
+                            StageName = Label.Opportunity_Stage_Prospecting,
+                            NextStep = 'This opportunity has been moved back to Prospecting as no active primary segment was found on the account. Please update the account\'s and opportunity segment and progress the opportunity stage to Negotiation.'
+                        ));
                     }
                 }
             }
 
             insert primarySegmentsForInsert;
+
+            if (!oppsToMoveBack.isEmpty()) {
+                update oppsToMoveBack;
+            }
         }
     }
 

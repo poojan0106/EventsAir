@@ -14,7 +14,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     Integer contactsLimit = Integer.valueOf(System.Label.EventsAir_Attendee_Contact_Limit);
     Integer regLimit = Integer.valueOf(System.Label.EventsAir_Registartion_Limit);
     List<Contact> lstInsrtCon;
+    List<Contact> lstUpdateCon;
     List<Lead> lstInsrtLead;
+    List<Lead> lstUpdateLead;
     List<Product_Service_Option__c> lstInsrtProdAndServices;
     public List<Event__c> eventData = new List<Event__c>();
     Map<String, Id> mapOfLeadStringAndId = new Map<String, Id>();
@@ -23,6 +25,8 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     Map<String, Id> mapOfEvnproandSfId = new Map<String, Id>();
     Map<String, Id> mapOfEventRegTypeIdAndSFPBentryId = new Map<String, Id>();
     String RecordType;
+    private static Set<String> leadOrganisationTypeValues;
+    private static Set<String> contactOrganisationTypeValues;
     //fetch current offset value from custom setting
     List<Manage_Eventsair_Reg_Apex_batch__c> lstcustsett = [SELECT Id, Name, Offset__c, Is_Execute_Next__c,Generic_Email_Domains__c 
                                                             FROM Manage_Eventsair_Reg_Apex_batch__c LIMIT 1];
@@ -39,7 +43,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     public Iterable<ResponseWrapper> start(Database.BatchableContext BC) {  
 
         if(eventData.size() > 0) {
-        	RecordType = eventData[0].RecordType.Name;  //set record type name
+            RecordType = eventData[0].RecordType.Name;  //set record type name
         }           
         
         String graphqlQuery;
@@ -134,8 +138,13 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         // Determine custom parts based on RecordType
         if (RecordType != 'Mumbrella') {
             customFieldParam = ', $input: CustomFieldSearchFilterInput!';
-            customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
-            customVariables = ', "input": { "names": ["Industry" , "Company Size" , "Job Function"] }';
+            customFieldsSection = 'customFields(input: $input , limit:4){name, definitionId, value},';
+            customVariables = ', "input": { "names": [' +
+                '"Industry", ' +
+                '"Company Size", ' +
+                '"Job Function", ' +
+                '"Organisation Type"' +
+                '] }';
         }
 
         // Replace placeholders in the template
@@ -181,6 +190,106 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         // Return the response list
         return lstofresponseWrapper;
     }
+
+    @TestVisible
+    private static void applyOrganisationType(Contact contactRecord, String eventsAirFieldName, Object rawValue) {
+        String organisationType = getOrganisationType(eventsAirFieldName, rawValue);
+        if (organisationType != null && getContactOrganisationTypeValues().contains(organisationType)) {
+            contactRecord.Organisation_Type__c = organisationType;
+        }
+    }
+
+    @TestVisible
+    private static void applyOrganisationType(Lead leadRecord, String eventsAirFieldName, Object rawValue) {
+        String organisationType = getOrganisationType(eventsAirFieldName, rawValue);
+        if (organisationType != null && getLeadOrganisationTypeValues().contains(organisationType)) {
+            leadRecord.Organisation_Type__c = organisationType;
+        }
+    }
+
+    private static String getOrganisationType(String eventsAirFieldName, Object rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+
+        Set<String> supportedFieldNames = new Set<String>{
+            'Organisation Type'
+        };
+        if (!supportedFieldNames.contains(eventsAirFieldName)) {
+            return null;
+        }
+
+        String organisationType = String.valueOf(rawValue).trim();
+        return String.isBlank(organisationType) ? null : organisationType;
+    }
+
+    private static Set<String> getLeadOrganisationTypeValues() {
+        if (leadOrganisationTypeValues == null) {
+            leadOrganisationTypeValues = getActivePicklistValues(Lead.Organisation_Type__c);
+        }
+        return leadOrganisationTypeValues;
+    }
+
+    private static Set<String> getContactOrganisationTypeValues() {
+        if (contactOrganisationTypeValues == null) {
+            contactOrganisationTypeValues = getActivePicklistValues(Contact.Organisation_Type__c);
+        }
+        return contactOrganisationTypeValues;
+    }
+
+    private static Set<String> getActivePicklistValues(Schema.SObjectField fieldToken) {
+        Set<String> values = new Set<String>();
+        for (Schema.PicklistEntry picklistEntry : fieldToken.getDescribe().getPicklistValues()) {
+            if (picklistEntry.isActive()) {
+                values.add(picklistEntry.getValue());
+            }
+        }
+        return values;
+    }
+
+    @TestVisible
+    private static void applyStateCountryFields(Contact contactRecord, Map<String, Object> eventContactMap) {
+        Map<String, Object> eventAddressMap = getEventAddressMap(eventContactMap);
+        if (eventAddressMap == null || !areCoreAddressFieldsBlank(contactRecord)) {
+            return;
+        }
+
+        contactRecord.MailingCountry = getAddressValue(eventAddressMap.get('country'));
+        contactRecord.MailingState = getAddressValue(eventAddressMap.get('state'));
+    }
+
+    @TestVisible
+    private static void applyStateCountryFields(Lead leadRecord, Map<String, Object> eventContactMap) {
+        Map<String, Object> eventAddressMap = getEventAddressMap(eventContactMap);
+        if (eventAddressMap == null || !areCoreAddressFieldsBlank(leadRecord)) {
+            return;
+        }
+
+        leadRecord.Country = getAddressValue(eventAddressMap.get('country'));
+        leadRecord.State = getAddressValue(eventAddressMap.get('state'));
+    }
+
+    private static Map<String, Object> getEventAddressMap(Map<String, Object> eventContactMap) {
+        Object eventAddress = eventContactMap.get('primaryAddress');
+        return eventAddress == null ? null : (Map<String, Object>) eventAddress;
+    }
+
+    private static Boolean areCoreAddressFieldsBlank(Contact contactRecord) {
+        return String.isBlank(contactRecord.MailingStreet)
+            && String.isBlank(contactRecord.MailingCity)
+            && String.isBlank(contactRecord.MailingPostalCode);
+    }
+
+    private static Boolean areCoreAddressFieldsBlank(Lead leadRecord) {
+        return String.isBlank(leadRecord.Street)
+            && String.isBlank(leadRecord.City)
+            && String.isBlank(leadRecord.PostalCode);
+    }
+
+    private static String getAddressValue(Object rawValue) {
+        String value = rawValue == null ? null : String.valueOf(rawValue).trim();
+        return String.isBlank(value) ? null : value;
+    }
     
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
     
@@ -191,7 +300,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         Map<String, Object> eventDatamap;
         
         //if any error occur while importing registartion then do chatter post related to event
-    	try{
+        try{
         if (responseWrapper.size() > 0) {
             serializedResponseWrapper = JSON.serialize(responseWrapper[0]);
 
@@ -310,7 +419,9 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         
         // Lists to store records for insertion
         lstInsrtLead = new List<Lead>();
+        lstUpdateLead = new List<Lead>();
         lstInsrtCon = new List<Contact>();
+        lstUpdateCon = new List<Contact>();
         lstInsrtProdAndServices = new List<Product_Service_Option__c>();
 
         // Sets and Maps for handling domain names and account information 
@@ -472,23 +583,27 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         }
         
         // fetch contact from sf based on combined String
-        List<Contact> listOfAllContact = [SELECT Id, FirstName, LastName, Email, CombinedString__c FROM Contact
-                                             WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
+        List<Contact> listOfAllContact = [SELECT Id, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, Organisation_Type__c, FirstName, LastName, Email, CombinedString__c, MailingCity, MailingCountry, MailingState, MailingStreet, MailingPostalCode FROM Contact
+                                          WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueContactString = new Map<String, Boolean>();
-            
+        Map<String, Contact> mapOfUniqueContactStringToUpdate = new Map<String, Contact>();
+        
         //loop through existing Contacts and fill the map to use for mapping with registration
         for(Contact objContact :listOfAllContact){
             mapOfUniqueContactString.put(objContact.CombinedString__c, true); 
+            mapOfUniqueContactStringToUpdate.put(objContact.CombinedString__c, objContact); 
         }
-
+        
         // fetch Lead from sf based on combined String
-        List<Lead> listOfAllLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead
-                                          WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
+        List<Lead> listOfAllLead = [SELECT Id, Title, Company , Industry__c, Job_Function__c, Company_Size__c, Organisation_Type__c, FirstName, LastName , Email, CombinedString__c, PostalCode, State, Country, Street, City FROM Lead
+                                    WHERE CombinedString__c in :setOfCombinedEventsAirAttendee AND IsConverted = false LIMIT 50000];
         Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
-            
+        Map<String, Lead> mapOfUniqueLeadStringToUpdate = new Map<String, Lead>();
+        
         //loop through existing Leads and fill the map to use for mapping with registration
         for(Lead objLead :listOfAllLead){
             mapOfUniqueLeadString.put(objLead.CombinedString__c, true); 
+            mapOfUniqueLeadStringToUpdate.put(objLead.CombinedString__c, objLead); 
         }
 
         // loop through event's air contact for create Lead/Contact based on Paid/Unpaid registrations
@@ -530,16 +645,18 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                     Map<String, Object> eventregPaymentdetails = (Map<String, Object>) eventReg.get('paymentDetails');
                     Decimal totalcharge = (Decimal) eventregPaymentdetails.get('totalChargeAmount');
                     
-                    //create contact and account in salesforce if not exist for paid registartions
-                    if(totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString)) {
+                                        // update existing contact for paid registrations; otherwise use/create a Lead
+                    if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
+                        // update contact for paid function registration
 
-                        // contact creation for paid registrations
-                        Contact objcon = new Contact();
-                        objcon.RecordTypeId = Schema.SObjectType.Contact.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();  
+                        Contact objCon = mapOfUniqueContactStringToUpdate.get(CombinedString);
 
-                        if (RecordType == 'Mumbrella') {
-                            objcon.Business_Unit__c = 'Mumbrella';
-                        } else {
+                        if (objCon.Organization_Name__c == null || objCon.Organization_Name__c == '') {
+                            objCon.Organization_Name__c = (String) eventConMap.get('organizationName');
+                        }
+
+                        if (RecordType != 'Mumbrella') {
+                        
                             List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
                             for (Object fields : lsteventsairCustomFields) {
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
@@ -554,150 +671,140 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                                     if(FieldName == 'Job Function'){
                                         objcon.Job_Function__c = (String) customFieldsMap.get('value');
                                     }
+                                    applyOrganisationType(objcon, FieldName, customFieldsMap.get('value'));
                                 }
                             }
-                            objcon.Business_Unit__c = 'Divcom'; 
                         }
 
-                        objcon.Organization_Name__c = (String) eventConMap.get('organizationName');
-                        objcon.EventsAir_Con_ID__c = (String) eventConMap.get('id');
-                        String strFirstName = (String) eventConMap.get('firstName');
+                        applyStateCountryFields(objCon, eventconmap);
+                        lstupdateCon.add(objCon);
 
+                    } else if(!mapOfUniqueContactString.containsKey(CombinedString) && !mapOfUniqueLeadString.containsKey(CombinedString)){
+                        // create lead for unpaid registration if CombinedString is not found in existing contact OR in lead
+                        //lead field mapping
+                        Lead newLead = new Lead();
+                        newLead.RecordTypeId = Schema.SObjectType.Lead.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();
+                        
+                        String strFirstName = (String) eventConMap.get('firstName');
                         if (strFirstName != null )  {
                             if(strFirstName.length() <= 40) {
-                                objCon.FirstName = strFirstName.trim();
+                                newLead.FirstName= strFirstName.trim();
                             } else {
-                                objCon.FirstName = strFirstName.substring(0,40).trim();
+                                newLead.FirstName = strFirstName.substring(0,40).trim();
                             }
                         } else {
-                            objCon.FirstName = '';
+                            strFirstName = ''; 
                         }
 
                         String strLastName = (String) eventConMap.get('lastName');
-                        if(strLastName == null || strLastName == '') {
-                            objcon.LastName = 'UnKnown';
+                        if(strLastName == null || strLastName == '' ) {
+                            newLead.LastName = 'UnKnown';
                         } else {
-                            objcon.LastName = strLastName.trim();
-                        }     
+                            newLead.LastName = strLastName.trim();
+                        }
 
-                        //objCon.Events_Air_Contact_Id__c = (String) eventConMap.get('id');
+                        //newLead.EventsAir_Contact_Id__c = (String) eventConMap.get('id');
                         String stremail = (String) eventConMap.get('primaryEmail');
                         if(stremail != null && stremail != '') {
                             stremail = stremail.trim();
-                            objcon.Email = stremail;
+                            newLead.Email = stremail;
                         } else {
-                            objcon.Email = '';
+                            newLead.Email = '';
                         }
 
                         String strWorkPhone = (String) eventConMap.get('workPhone');
                         if(strWorkPhone != null && strWorkPhone != '') {
                             strWorkPhone = strWorkPhone.trim();
-                            objcon.MobilePhone = strWorkPhone;
-                            objcon.Phone = strWorkPhone;
+                            newLead.MobilePhone = strWorkPhone;
+                            newLead.Phone = strWorkPhone;
                         }
 
-                        if(setOfGenericDomain.contains(strAccdomainname)) {
-                            // Assign AccountId to contact Prioirty :- organization name match                       
-                            
-                            if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
-                                System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccountId.get(orgName));
-                                objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
-                            }
+                        newLead.Event_Category__c = eventCategory;
+
+                        if (RecordType == 'Mumbrella') {
+                            newLead.Business_Unit__c = 'Mumbrella';
                         } else {
-                            // Assign AccountId to contact Prioirty :-  1) domain name match 2) organization name match                       
-                            if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
-                                objcon.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-                            } else if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
-                                System.debug('coming for organization Name :-' + MapOfexistingAccountsOrgNameAndAccountId.get(orgName));
-                                objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
-                            }
-                        }
-                        lstInsrtCon.add(objcon);
-                    } else {
-                        // create lead for unpaid registration if CombinedString is not found in existing contact OR in lead
-                        if(!mapOfUniqueLeadString.containsKey(CombinedString)){
-
-                            //lead field mapping
-                            Lead newLead = new Lead();
-                            newLead.RecordTypeId = Schema.SObjectType.Lead.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();
+                            List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
                             
-                            String strFirstName = (String) eventConMap.get('firstName');
-                            if (strFirstName != null )  {
-                                if(strFirstName.length() <= 40) {
-                                    newLead.FirstName= strFirstName.trim();
-                                } else {
-                                    newLead.FirstName = strFirstName.substring(0,40).trim();
-                                }
-                            } else {
-                                strFirstName = ''; 
-                            }
-
-                            String strLastName = (String) eventConMap.get('lastName');
-                            if(strLastName == null || strLastName == '' ) {
-                                newLead.LastName = 'UnKnown';
-                            } else {
-                                newLead.LastName = strLastName.trim();
-                            }
-
-                            //newLead.EventsAir_Contact_Id__c = (String) eventConMap.get('id');
-                            String stremail = (String) eventConMap.get('primaryEmail');
-                            if(stremail != null && stremail != '') {
-                                stremail = stremail.trim();
-                                newLead.Email = stremail;
-                            } else {
-                                newLead.Email = '';
-                            }
-
-                            String strWorkPhone = (String) eventConMap.get('workPhone');
-                            if(strWorkPhone != null && strWorkPhone != '') {
-                                strWorkPhone = strWorkPhone.trim();
-                                newLead.MobilePhone = strWorkPhone;
-                                newLead.Phone = strWorkPhone;
-                            }
-
-                            newLead.Event_Category__c = eventCategory;
-                            newLead.Business_Unit__c = 'Divcom';
-
-                            if (RecordType != 'Mumbrella') {
-                                List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
-                                
-                                for (Object fields : lsteventsairCustomFields) {
-                                    Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
-                                    String FieldName = (String) customFieldsMap.get('name');
-                                    if (FieldName != '' && FieldName != null) {
-                                        if (FieldName =='Industry') {
-                                            newLead.Industry__c =(String) customFieldsMap.get('value');
-                                        }
-                                        if(FieldName == 'Company Size'){
-                                            newLead.Company_Size__c = (String) customFieldsMap.get('value');
-                                        }
-                                        if(FieldName == 'Job Function'){
-                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                        }
+                            for (Object fields : lsteventsairCustomFields) {
+                                Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
+                                String FieldName = (String) customFieldsMap.get('name');
+                                if (FieldName != '' && FieldName != null) {
+                                    if (FieldName =='Industry') {
+                                        newLead.Industry__c =(String) customFieldsMap.get('value');
                                     }
-                                }  
-                            } 
-
-                            String strOrganization = (String) eventConMap.get('organizationName');
-                            if(strOrganization != null && strOrganization != '') {
-                                newLead.Company = strOrganization;
+                                    if(FieldName == 'Company Size'){
+                                        newLead.Company_Size__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function'){
+                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                    applyOrganisationType(newLead, FieldName, customFieldsMap.get('value'));
+                                }
                             }
-                            else{
-                                newLead.Company = 'Unknown';
-                            }
+                            newLead.Business_Unit__c = 'Divcom';  
+                        } 
 
-                            newLead.Status = 'New';
-                            lstInsrtLead.add(newLead);
-                            mapOfUniqueLeadString.put(newLead.CombinedString__c , true);
+                        String strOrganization = (String) eventConMap.get('organizationName');
+                        if(strOrganization != null && strOrganization != '') {
+                            newLead.Company = strOrganization;
                         }
+                        else{
+                            newLead.Company = 'Unknown';
+                        }
+
+                        newLead.Status = 'New';
+
+                        Object eventconadress = eventconmap.get('primaryAddress');
+                        Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
+                        if(eventconAdressmap != null) {
+                            if(eventconAdressmap.get('country') != null){
+                                newLead.Country = (String) eventconAdressmap.get('country');
+                            }
+                            if(eventconAdressmap.get('state') != null){
+                                newLead.State = (String) eventconAdressmap.get('state'); 
+                            }
+                        }
+                        lstInsrtLead.add(newLead);
+                    } else if(!mapOfUniqueContactString.containsKey(CombinedString) && mapOfUniqueLeadStringToUpdate.containsKey(CombinedString)) {
+                        // update lead for unpaid function registration
+                        Lead newLead = mapOfUniqueLeadStringToUpdate.get(CombinedString);
+                        
+                        if (newLead.Company == null || newLead.Company == '') {
+                            newLead.Company = (String) eventConMap.get('organizationName');
+                        }
+
+                        if (RecordType != 'Mumbrella') {
+                            List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
+                                
+                            for (Object fields : lsteventsairCustomFields) {
+                                Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
+                                String FieldName = (String) customFieldsMap.get('name');
+                                if (FieldName != '' && FieldName != null) {
+                                    if (FieldName =='Industry') {
+                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Company Size'){
+                                        newLead.Company_Size__c = (String) customFieldsMap.get('value');
+                                    }
+                                    if(FieldName == 'Job Function'){
+                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                    }
+                                    applyOrganisationType(newLead, FieldName, customFieldsMap.get('value'));
+                                }
+                            }  
+                        }
+
+                        applyStateCountryFields(newLead, eventconmap);
+                        lstupdateLead.add(newLead);
                     }
                 }
             }
         }
 
         // Insert Contacts
-        if (!lstInsrtCon.isEmpty()) {            
-            insertContactsIfNotExist(lstInsrtCon, mapOfUniqueContactString);   
+        if (!lstInsrtCon.isEmpty() || !lstUpdateCon.isEmpty()) {            
+            insertContactsIfNotExist(lstInsrtCon, mapOfUniqueContactString, lstUpdateCon);   
             system.debug('insertContactsIfNotExist');
         }
 
@@ -710,14 +817,14 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         }
         
         // Insert Lead
-        if (!lstInsrtLead.isEmpty()) {
-            insertLeadsIfNotExist(lstInsrtLead, mapOfUniqueLeadString); 
+        if (!lstInsrtLead.isEmpty() || !lstUpdateLead.isEmpty()) {
+            insertLeadsIfNotExist(lstInsrtLead, mapOfUniqueLeadString, lstUpdateLead); 
             system.debug('insertLeadsIfNotExist');
         }
 
         // fetch all Lead 
         List<Lead> LstOfExtistingLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead 
-                                            WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
+                                            WHERE CombinedString__c in :setOfCombinedEventsAirAttendee AND IsConverted = false LIMIT 50000];
     
         for(Lead objLead :LstOfExtistingLead) {
             mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
@@ -725,7 +832,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         
         List<Registration__c> lstInsrtReg = new List<Registration__c>(); 
         List<Opportunity> lstInsrtOpp = new List<Opportunity>();
-		Map<String,String> mapOfEventsairRegIdandCheckidDate = new Map<String,String>();
+        Map<String,String> mapOfEventsairRegIdandCheckidDate = new Map<String,String>();
         // fetch pricebook related to the event Record
         List<Pricebook2> lstPriceook = [Select Id from Pricebook2 where Events__c =: sfeventId LIMIT 50000];
         
@@ -775,9 +882,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
 
 
                     if(Finalstring != null && Finalstring != '') {
-                        if(mapOfContactStringAndId.containsKey(Finalstring) && mapOfLeadStringAndId.containsKey(Finalstring)) {
-                            prodAndService.Lead__c = mapOfLeadStringAndId.get(Finalstring);
-                        }else if(mapOfContactStringAndId.containsKey(Finalstring)){
+                        if(mapOfContactStringAndId.containsKey(Finalstring)){
                             prodAndService.Contact__c = mapOfContactStringAndId.get(Finalstring);
                         }else {
                             // connect with exiting or newly created lead
@@ -815,25 +920,20 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                     if (checkInDate != null) {
                         objreg.CheckInDate__c = (Datetime) JSON.deserialize('"' + checkInDate + '"', Datetime.class);     
                     }
-					mapOfEventsairRegIdandCheckidDate.put((string)eventReg.get('id'),checkInDate);
+                    mapOfEventsairRegIdandCheckidDate.put((string)eventReg.get('id'),checkInDate);
                     if (checkOutDate != null) {
-                        objreg.CheckOutDate__c	 = (Datetime) JSON.deserialize('"' + checkOutDate + '"', Datetime.class);  
+                        objreg.CheckOutDate__c   = (Datetime) JSON.deserialize('"' + checkOutDate + '"', Datetime.class);  
                     }
                     
                     if(Finalstring != null && Finalstring != '') {
                         // connect contact with paid registrations
-                        if( totalcharge > 0 && mapOfContactStringAndId.containsKey(Finalstring)) {
+                        if( mapOfContactStringAndId.containsKey(Finalstring)) {
                             objreg.Contact__c = mapOfContactStringAndId.get(Finalstring);
                         }else {
-                            // // connect contact if it is created before
-                            // if(mapOfContactStringAndId.containsKey(Finalstring)) {
-                            //     objreg.Contact__c = mapOfContactStringAndId.get(Finalstring);
-                            // }else{
-                                // connect with exiting or newly created lead
-                                if(mapOfLeadStringAndId.containsKey(Finalstring)) {
-                                    objreg.Lead__c = mapOfLeadStringAndId.get(Finalstring);
-                                }
-                            // }
+                            // connect with exiting or newly created lead
+                            if(mapOfLeadStringAndId.containsKey(Finalstring)) {
+                                objreg.Lead__c = mapOfLeadStringAndId.get(Finalstring);
+                            }
                         }
                     }
                     
@@ -953,14 +1053,14 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     }   
     
     // Method for insert only new Contacts if not exist in salesforce
-    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Map<String, Boolean> mapOfUniqueContactString) {
-
+    public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Map<String, Boolean> mapOfUniqueContactString , List<Contact> lstUpdateCon) {
+        
         List<Contact> FinalListOfContactToInsert = new List<Contact>();
         Set<String> setOfCurrentContactCombinedData = new Set<String>();
         
         //loop through the passed data of contact for insert and extract unique contacts for insert
         for(Contact objcontact :contactsToInsert){
-
+            
             String strcombinedEventsAirAttendee = objcontact.FirstName + objcontact.LastName + objcontact.Email; 
             strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
             
@@ -975,13 +1075,37 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         }
         
         if(FinalListOfContactToInsert.size()>0){
-            Database.insert(FinalListOfContactToInsert,false);
-        } 
+            insert FinalListOfContactToInsert;
+        }
+        
+        // update contact
+        List<Contact> FinalListOfContactToUpdate = new List<Contact>();
+        Set<String> setOfCurrentContactCombinedDataForUpdate = new Set<String>();
+        
+        //loop through the passed data of contact for update and extract unique contacts for update
+        for(Contact objcontact :lstUpdateCon){
+            String strcombinedEventsAirAttendee = objcontact.FirstName + objcontact.LastName + objcontact.Email; 
+            strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
+            
+            // check if contact is exist or not
+            if(mapOfUniqueContactString.ContainsKey(strcombinedEventsAirAttendee)){
+                // for prevent adding duplicate contact in list
+                if(!setOfCurrentContactCombinedDataForUpdate.contains(strcombinedEventsAirAttendee)){
+                    FinalListOfContactToUpdate.add(objcontact);
+                    setOfCurrentContactCombinedDataForUpdate.add(strcombinedEventsAirAttendee);
+                }
+            }
+        }
+        
+        if(FinalListOfContactToUpdate.size()>0){
+            update FinalListOfContactToUpdate;
+        }
+        
     }
-
+    
     // Method for insert only new Leads if not exist in salesforce
-    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Map<String, Boolean> mapOfUniqueLeadString) {
-
+    public static void insertLeadsIfNotExist(List<Lead> leadsToInsert, Map<String, Boolean> mapOfUniqueLeadString , List<Lead> lstUpdateLead) {
+        
         List<Lead> FinalListOfLeadToInsert = new List<Lead>();
         Set<String> setOfCurrentleadCombinedData = new Set<String>();
         
@@ -1002,6 +1126,28 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
         if(FinalListOfLeadToInsert.size()>0){
             insert FinalListOfLeadToInsert;
         } 
+        
+        // update lead
+        List<Lead> FinalListOfLeadToUpdate = new List<Lead>();
+        Set<String> setOfCurrentleadCombinedDataForUpdate = new Set<String>();
+        
+        for(Lead objLead :lstUpdateLead){
+            String strcombinedEventsAirAttendee= objLead.FirstName+objLead.LastName+objLead.Email; 
+            strcombinedEventsAirAttendee = strcombinedEventsAirAttendee.toLowerCase();
+            
+            // check if lead exist or not
+            if(mapOfUniqueLeadString.ContainsKey(strcombinedEventsAirAttendee)){
+                // for prevent adding duplicate lead in list
+                if(!setOfCurrentleadCombinedDataForUpdate.contains(strcombinedEventsAirAttendee)){
+                    FinalListOfLeadToUpdate.add(objLead);
+                    setOfCurrentleadCombinedDataForUpdate.add(strcombinedEventsAirAttendee);
+                }
+            }
+        }
+        
+        if(FinalListOfLeadToUpdate.size()>0){
+            update FinalListOfLeadToUpdate;
+        }
     }
 
     // Method for insert only new Product_Service_Option if not exist in salesforce
@@ -1058,7 +1204,7 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
     public void insertRegistrationIfNotExist(List<Registration__c> lstInsrtReg,Map<String,String> mapOfEventsairRegIdandCheckidDate) {
         
         Map<String, Id> mapOfEvnRegIdandSfRegId = new Map<String, Id>();
-		Map<String, Datetime> mapOfExistingEvnRegIdandCheckinDate = new Map<String, Datetime>();
+        Map<String, Datetime> mapOfExistingEvnRegIdandCheckinDate = new Map<String, Datetime>();
         set<String> setOfEvnRegIds = new set<String>(); // holds eventsAir registration record Id
         
         for(Registration__c reg: lstInsrtReg) {
@@ -1553,8 +1699,8 @@ public class ImportRegistartionFromEventsAirBatch implements Database.Batchable<
                 lstcustsett2[0].Offset__c = lstcustsett[0].Offset__c + contactsLimit;
                 update lstcustsett2;
                 
-                ImportRegistartionFromEventsAirBatch newBatch = new ImportRegistartionFromEventsAirBatch(strEventId, sfeventId);
-                Database.executeBatch(newBatch, 500);
+               ImportRegistartionFromEventsAirBatch newBatch = new ImportRegistartionFromEventsAirBatch(strEventId, sfeventId);
+               Database.executeBatch(newBatch, 500);
             }
             else {
                 // update custom setting

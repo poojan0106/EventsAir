@@ -1,0 +1,343 @@
+{
+  "data": {
+    "event": {
+      "id": "80D8596E-27B8-4E79-A46A-E86104CF3C92",
+      "name": "AOG Energy 2024",
+      "startDate": "2024-03-12",
+      "endDate": "2024-03-15",
+      "logo": null,
+      "contacts": [
+        {
+          "customFields": [
+            { "name": "Industry SEC", "definitionId": "IND-SEC", "value": "Exploration & Production" },
+            { "name": "Job Function SEC", "definitionId": "JOB-SEC", "value": "Manager" },
+            { "name": "Company Size", "definitionId": "SIZE-1", "value": "500+" }
+          ],
+          "marketingRecords": [
+            {
+              "id": "MRK-1",
+              "name": "Product & Service Categories",
+              "tag": { "id": "TAG-1", "name": "Product & Service Categories" },
+              "value": "Decommissioning"
+            }
+          ],
+          "id": "SEED-CONTACT-ID",
+          "lastName": "Contact",
+          "firstName": "Seed",
+          "title": "He/Him",
+          "jobTitle": "Manager",
+          "organizationName": "Seed Account",
+          "checkInDate": "2024-03-13T00:36:38.188Z",
+          "checkOutDate": null,
+          "primaryEmail": "seed.contact@gmail.com",
+          "primaryAddress": {
+            "city": null,
+            "country": "Australia",
+            "line1": null,
+            "line2": null,
+            "line3": null,
+            "postCode": "6000",
+            "state": "WA"
+          },
+          "contactPhoneNumbers": null,
+          "functionRegistrations": [
+            {
+              "id": "REG-SEED-PAID",
+              "tickets": 1,
+              "checkInDate": "2024-03-13T08:10:06.300Z",
+              "checkOutDate": null,
+              "createdAt": "2024-03-13T08:10:06.300Z",
+              "feeType": {
+                "id": "FEE-SEC-1",
+                "name": "1 Day Conference Pass - Thursday",
+                "uniqueCode": "UT-FEE-SEC-1",
+                "fees": [{ "amount": 110 }]
+              },
+              "function": {
+                "id": "FUN-REG-SEED-PAID",
+                "name": "1 Day Conference Pass - Thursday",
+                "start": "17:00",
+                "date": "2024-03-13",
+                "end": "19:00",
+                "overview": "Overview",
+                "details": "Details"
+              },
+              "paymentDetails": {
+                "paymentStatus": "PURCHASE",
+                "discountAmount": 0,
+                "adjustmentAmount": 0,
+                "taxAmount": 0,
+                "totalChargeAmount": 110,
+                "discountCode": { "code": "A024" }
+              }
+            }
+          ]
+        },
+        {
+          "customFields": [
+            { "name": "Industry SEC", "definitionId": "IND-SEC", "value": "Consultant" },
+            { "name": "Job Function SEC", "definitionId": "JOB-SEC", "value": "CEO / Company Director" },
+            { "name": "Company Size", "definitionId": "SIZE-1", "value": "500+" }
+          ],
+          "marketingRecords": [
+            {
+              "id": "MRK-2",
+              "name": "Product & Service Categories",
+              "tag": { "id": "TAG-1", "name": "Product & Service Categories" },
+              "value": "Training & Education"
+            }
+          ],
+          "id": "SEED-LEAD-ID",
+          "lastName": "Lead",
+          "firstName": "Seed",
+          "title": "He/Him",
+          "jobTitle": "Consultant",
+          "organizationName": "Seed Co",
+          "checkInDate": "2024-03-13T00:36:38.188Z",
+          "checkOutDate": null,
+          "primaryEmail": "seed.lead@gmail.com",
+          "primaryAddress": {
+            "city": null,
+            "country": "Australia",
+            "line1": null,
+            "line2": null,
+            "line3": null,
+            "postCode": "6001",
+            "state": "WA"
+          },
+          "contactPhoneNumbers": null,
+          "functionRegistrations": [
+            {
+              "id": "REG-SEED-UNPAID",
+              "tickets": 1,
+              "checkInDate": "2024-03-13T08:10:06.300Z",
+              "checkOutDate": null,
+              "createdAt": "2024-03-13T08:10:06.300Z",
+              "feeType": {
+                "id": "FEE-SEC-1",
+                "name": "1 Day Conference Pass - Thursday",
+                "uniqueCode": "UT-FEE-SEC-1",
+                "fees": [{ "amount": 110 }]
+              },
+              "function": {
+                "id": "FUN-REG-SEED-UNPAID",
+                "name": "1 Day Conference Pass - Thursday",
+                "start": "17:00",
+                "date": "2024-03-13",
+                "end": "19:00",
+                "overview": "Overview",
+                "details": "Details"
+              },
+              "paymentDetails": {
+                "paymentStatus": "INCLUSIVE",
+                "discountAmount": 0,
+                "adjustmentAmount": 0,
+                "taxAmount": 0,
+                "totalChargeAmount": 0,
+                "discountCode": null
+              }
+            }
+          ]
+        },
+        {
+          "customFields": [
+            { "name": "Industry SEC", "definitionId": "IND-SEC", "value": "Engineering" },
+            { "name": "Job Function SEC", "definitionId": "JOB-SEC", "value": "Engineer - Design" },
+            { "name": "Company Size", "definitionId": "SIZE-1", "value": "500+" }
+          ],
+          "marketingRecords": [
+            {
+              "id": "MRK-3",
+              "name": "Product & Service Categories",
+              "tag": { "id": "TAG-1", "name": "Product & Service Categories" },
+              "value": "Engineering & Consultancy Services"
+            }
+          ],
+          "id": "PAID-ALPHA-ID",
+          "lastName": "Alpha",
+          "firstName": "New",
+          "title": "She/Her",
+          "jobTitle": "Engineer",
+          "organizationName": "Alpha Holdings",
+          "checkInDate": "2024-03-14T03:23:25.765Z",
+          "checkOutDate": null,
+          "primaryEmail": "new.paid@alpha.co",
+          "primaryAddress": {
+            "city": null,
+            "country": "Australia",
+            "line1": null,
+            "line2": null,
+            "line3": null,
+            "postCode": "3000",
+            "state": "VIC"
+          },
+          "contactPhoneNumbers": null,
+          "functionRegistrations": [
+            {
+              "id": "REG-PAID-ALPHA",
+              "tickets": 1,
+              "checkInDate": "2024-03-13T08:10:06.300Z",
+              "checkOutDate": null,
+              "createdAt": "2024-03-13T08:10:06.300Z",
+              "feeType": {
+                "id": "FEE-SEC-1",
+                "name": "1 Day Conference Pass - Thursday",
+                "uniqueCode": "UT-FEE-SEC-1",
+                "fees": [{ "amount": 110 }]
+              },
+              "function": {
+                "id": "FUN-REG-PAID-ALPHA",
+                "name": "1 Day Conference Pass - Thursday",
+                "start": "17:00",
+                "date": "2024-03-13",
+                "end": "19:00",
+                "overview": "Overview",
+                "details": "Details"
+              },
+              "paymentDetails": {
+                "paymentStatus": "PURCHASE",
+                "discountAmount": 0,
+                "adjustmentAmount": 0,
+                "taxAmount": 0,
+                "totalChargeAmount": 110,
+                "discountCode": { "code": "A024" }
+              }
+            }
+          ]
+        },
+        {
+          "customFields": [
+            { "name": "Industry SEC", "definitionId": "IND-SEC", "value": "Marine" },
+            { "name": "Job Function SEC", "definitionId": "JOB-SEC", "value": "CEO / Company Director" },
+            { "name": "Company Size", "definitionId": "SIZE-1", "value": "500+" }
+          ],
+          "marketingRecords": [
+            {
+              "id": "MRK-4",
+              "name": "Product & Service Categories",
+              "tag": { "id": "TAG-1", "name": "Product & Service Categories" },
+              "value": "Renewables"
+            }
+          ],
+          "id": "UNPAID-BETA-ID",
+          "lastName": "Beta",
+          "firstName": "New",
+          "title": "He/Him",
+          "jobTitle": "Analyst",
+          "organizationName": "Beta Co",
+          "checkInDate": "2024-03-14T04:26:03.909Z",
+          "checkOutDate": null,
+          "primaryEmail": "new.unpaid@beta.com",
+          "primaryAddress": {
+            "city": null,
+            "country": "Australia",
+            "line1": null,
+            "line2": null,
+            "line3": null,
+            "postCode": "2000",
+            "state": "NSW"
+          },
+          "contactPhoneNumbers": null,
+          "functionRegistrations": [
+            {
+              "id": "REG-UNPAID-BETA",
+              "tickets": 1,
+              "checkInDate": "2024-03-13T08:10:06.300Z",
+              "checkOutDate": null,
+              "createdAt": "2024-03-13T08:10:06.300Z",
+              "feeType": {
+                "id": "FEE-SEC-1",
+                "name": "1 Day Conference Pass - Thursday",
+                "uniqueCode": "UT-FEE-SEC-1",
+                "fees": [{ "amount": 110 }]
+              },
+              "function": {
+                "id": "FUN-REG-UNPAID-BETA",
+                "name": "1 Day Conference Pass - Thursday",
+                "start": "17:00",
+                "date": "2024-03-13",
+                "end": "19:00",
+                "overview": "Overview",
+                "details": "Details"
+              },
+              "paymentDetails": {
+                "paymentStatus": "INCLUSIVE",
+                "discountAmount": 0,
+                "adjustmentAmount": 0,
+                "taxAmount": 0,
+                "totalChargeAmount": 0,
+                "discountCode": null
+              }
+            }
+          ]
+        },
+        {
+          "customFields": [
+            { "name": "Industry SEC", "definitionId": "IND-SEC", "value": "Renewable Energy" },
+            { "name": "Job Function SEC", "definitionId": "JOB-SEC", "value": "Engineer - Electrical" },
+            { "name": "Company Size", "definitionId": "SIZE-1", "value": "500+" }
+          ],
+          "marketingRecords": [
+            {
+              "id": "MRK-5",
+              "name": "Product & Service Categories",
+              "tag": { "id": "TAG-1", "name": "Product & Service Categories" },
+              "value": "Power Generation & Energy Management"
+            }
+          ],
+          "id": "GENERIC-PAID-ID",
+          "lastName": "Generic",
+          "firstName": "New",
+          "title": "He/Him",
+          "jobTitle": "Engineer",
+          "organizationName": "Generic Paid Co",
+          "checkInDate": "2024-03-14T05:26:03.909Z",
+          "checkOutDate": null,
+          "primaryEmail": "generic.paid@gmail.com",
+          "primaryAddress": {
+            "city": null,
+            "country": "Australia",
+            "line1": null,
+            "line2": null,
+            "line3": null,
+            "postCode": "6002",
+            "state": "WA"
+          },
+          "contactPhoneNumbers": null,
+          "functionRegistrations": [
+            {
+              "id": "REG-GENERIC-PAID",
+              "tickets": 1,
+              "checkInDate": "2024-03-13T08:10:06.300Z",
+              "checkOutDate": null,
+              "createdAt": "2024-03-13T08:10:06.300Z",
+              "feeType": {
+                "id": "FEE-SEC-1",
+                "name": "1 Day Conference Pass - Thursday",
+                "uniqueCode": "UT-FEE-SEC-1",
+                "fees": [{ "amount": 110 }]
+              },
+              "function": {
+                "id": "FUN-REG-GENERIC-PAID",
+                "name": "1 Day Conference Pass - Thursday",
+                "start": "17:00",
+                "date": "2024-03-13",
+                "end": "19:00",
+                "overview": "Overview",
+                "details": "Details"
+              },
+              "paymentDetails": {
+                "paymentStatus": "PURCHASE",
+                "discountAmount": 0,
+                "adjustmentAmount": 0,
+                "taxAmount": 0,
+                "totalChargeAmount": 110,
+                "discountCode": { "code": "A024" }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

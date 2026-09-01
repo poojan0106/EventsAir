@@ -1,0 +1,267 @@
+{
+  "data": {
+    "event": {
+      "id": "EVT-COVERAGE-001",
+      "name": "AOG Energy Coverage",
+      "startDate": "2024-03-12",
+      "endDate": "2024-03-15",
+      "logo": null,
+      "contacts": [
+        {
+          "customFields": [
+            {
+              "name": "Industry SEC",
+              "definitionId": "6DEDE8D6-5A15-41C0-A597-FE31725B557E",
+              "value": "Facility Management"
+            },
+            {
+              "name": "Job Function SEC",
+              "definitionId": "D7ACADD2-CF2A-4C54-B57E-D64C4D519D3E",
+              "value": "Facility Manager"
+            },
+            {
+              "name": "Company Size",
+              "definitionId": "D30BE3F5-69A6-485B-BF03-BDA224BF06C8",
+              "value": "1 - 9"
+            }
+          ],
+          "marketingRecords": [
+            {
+              "id": "MKT-SEC-1",
+              "name": "Security Visitor",
+              "tag": {
+                "id": "TAG-SEC-1",
+                "name": "Security Visitor"
+              },
+              "value": "Security Visitor"
+            },
+            {
+              "id": "MKT-SEC-2",
+              "name": "Products & Service Categories",
+              "tag": {
+                "id": "TAG-SEC-2",
+                "name": "Products & Service Categories"
+              },
+              "value": "Machinery & Equipment"
+            }
+          ],
+          "id": "CON-SEC-1",
+          "lastName": "Abad Esteva",
+          "firstName": "Monica",
+          "title": null,
+          "jobTitle": "Facilities Lead",
+          "organizationName": "Cleanup Services",
+          "checkInDate": "2021-07-09T10:30:29.341Z",
+          "checkOutDate": null,
+          "primaryEmail": "monica@santos.com",
+          "primaryAddress": {
+            "city": "Perth",
+            "country": "Australia",
+            "line1": null,
+            "line2": null,
+            "line3": null,
+            "postCode": "6000",
+            "state": "WA"
+          },
+          "contactPhoneNumbers": {
+            "mobile": "+61426855867"
+          },
+          "registrations": [
+            {
+              "id": "REG-SEC-1",
+              "dateTime": "2021-07-09T10:30:29.341Z",
+              "type": {
+                "id": "TYPE-REG-1",
+                "name": "Visitor Registration",
+                "uniqueCode": null,
+                "fees": [
+                  {
+                    "amount": 100
+                  }
+                ]
+              },
+              "paymentDetails": {
+                "paymentStatus": "PURCHASE",
+                "discountAmount": 10,
+                "adjustmentAmount": 10,
+                "taxAmount": 0,
+                "totalChargeAmount": 100,
+                "discountCode": {
+                  "code": "A024"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "customFields": [
+            {
+              "name": "Industry INT",
+              "definitionId": "6DEDE8D6-5A15-41C0-A597-FE31725B557E",
+              "value": "Consultant"
+            },
+            {
+              "name": "Job Function INT",
+              "definitionId": "D7ACADD2-CF2A-4C54-B57E-D64C4D519D3E",
+              "value": "Consultant"
+            },
+            {
+              "name": "Company Size",
+              "definitionId": "D30BE3F5-69A6-485B-BF03-BDA224BF06C8",
+              "value": "500+"
+            }
+          ],
+          "marketingRecords": [
+            {
+              "id": "MKT-INT-1",
+              "name": "Integrate Visitor",
+              "tag": {
+                "id": "TAG-INT-1",
+                "name": "Integrate Visitor"
+              },
+              "value": "Integrate Visitor"
+            },
+            {
+              "id": "MKT-INT-2",
+              "name": "Visitor Pass",
+              "tag": {
+                "id": "TAG-INT-2",
+                "name": "Visitor Pass"
+              },
+              "value": "Conference"
+            }
+          ],
+          "id": "CON-INT-1",
+          "lastName": "Agarwal",
+          "firstName": "Mahesh",
+          "title": null,
+          "jobTitle": null,
+          "organizationName": "Mp Associates Pty Ltd new test Mp Associates Pty Ltd 12345 Mp Associates Pty Ltd Mp Associates Pty Ltd",
+          "checkInDate": null,
+          "checkOutDate": null,
+          "primaryEmail": "testrcs123@gmail.com",
+          "primaryAddress": {
+            "city": null,
+            "country": "Australia",
+            "line1": null,
+            "line2": null,
+            "line3": null,
+            "postCode": "2155",
+            "state": "NSW"
+          },
+          "contactPhoneNumbers": {
+            "mobile": "+61422834249"
+          },
+          "registrations": [
+            {
+              "id": "REG-INT-1",
+              "dateTime": "2021-06-16T01:15:14.768Z",
+              "type": {
+                "id": "TYPE-REG-1",
+                "name": "Visitor Registration",
+                "uniqueCode": null,
+                "fees": [
+                  {
+                    "amount": 0
+                  }
+                ]
+              },
+              "paymentDetails": {
+                "paymentStatus": "COMPLIMENTARY",
+                "discountAmount": 0,
+                "adjustmentAmount": 0,
+                "taxAmount": 0,
+                "totalChargeAmount": 0,
+                "discountCode": null
+              }
+            }
+          ]
+        },
+        {
+          "customFields": [
+            {
+              "name": "Industry FIRE",
+              "definitionId": "6DEDE8D6-5A15-41C0-A597-FE31725B557E",
+              "value": "Manufacturing"
+            },
+            {
+              "name": "Job Function FIRE",
+              "definitionId": "D7ACADD2-CF2A-4C54-B57E-D64C4D519D3E",
+              "value": "Engineer - Process"
+            },
+            {
+              "name": "Company Size",
+              "definitionId": "D30BE3F5-69A6-485B-BF03-BDA224BF06C8",
+              "value": "10 - 49"
+            }
+          ],
+          "marketingRecords": [
+            {
+              "id": "MKT-FIRE-1",
+              "name": "Fire Visitor",
+              "tag": {
+                "id": "TAG-FIRE-1",
+                "name": "Fire Visitor"
+              },
+              "value": "Fire Visitor"
+            },
+            {
+              "id": "MKT-FIRE-2",
+              "name": "Visitor Access",
+              "tag": {
+                "id": "TAG-FIRE-2",
+                "name": "Visitor Access"
+              },
+              "value": "Expo Hall"
+            }
+          ],
+          "id": "CON-FIRE-1",
+          "lastName": null,
+          "firstName": "Anna",
+          "title": "",
+          "jobTitle": "Engineer",
+          "organizationName": null,
+          "checkInDate": "2021-08-25T08:00:00.000Z",
+          "checkOutDate": null,
+          "primaryEmail": "anna.fire@gmail.com",
+          "primaryAddress": {
+            "city": null,
+            "country": "Australia",
+            "line1": null,
+            "line2": null,
+            "line3": null,
+            "postCode": "6000",
+            "state": "WA"
+          },
+          "contactPhoneNumbers": {
+            "mobile": "+61400000000"
+          },
+          "registrations": [
+            {
+              "id": "REG-FIRE-1",
+              "dateTime": "2021-08-25T08:00:00.000Z",
+              "type": {
+                "id": "TYPE-REG-1",
+                "name": "Visitor Registration",
+                "uniqueCode": null,
+                "fees": [
+                  {
+                    "amount": 50
+                  }
+                ]
+              },
+              "paymentDetails": {
+                "paymentStatus": "PURCHASE",
+                "discountAmount": 0,
+                "adjustmentAmount": 0,
+                "taxAmount": 0,
+                "totalChargeAmount": 50,
+                "discountCode": null
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

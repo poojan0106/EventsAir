@@ -78,7 +78,7 @@ export default class ImportCSVClone extends NavigationMixin(LightningElement) {
         this.fileReader = new FileReader();
 
         this.fileReader.onloadend = () => {
-            this.fileContents = this.fileReader.result;
+            this.fileContents = this.fileReader.result.replace(/[^\x00-\x7F]/g, '');;
             const rawLines = this.fileContents.split(/\r\n|\n/);
             console.log('rawLines.length : ',rawLines.length);
             let rows = [];
@@ -134,10 +134,11 @@ export default class ImportCSVClone extends NavigationMixin(LightningElement) {
                 this.showLoadingSpinner = false;
                 return;
             }*/
+
             this.processCSV();
         };
 
-        this.fileReader.readAsText(this.filesUploaded[0]);
+        this.fileReader.readAsText(this.filesUploaded[0], 'UTF-8');
     }
 
     processCSV() {

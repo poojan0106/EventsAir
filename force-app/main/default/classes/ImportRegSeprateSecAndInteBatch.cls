@@ -18,6 +18,8 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
     Map<String, String> selectedValuesMap = new Map<String, String>();
     Map<String, Id> mapOfEventRegTypeIdAndSFPBentryId = new Map<String, Id>();
     public String RecordType;
+    private static Set<String> leadOrganisationTypeValues;
+    private static Set<String> contactOrganisationTypeValues;
     
     //fetch current offset value from custom setting
     List<Manage_Eventsair_Sec_And_Int_Reg_batch__c> lstcustsett = [SELECT Id, Name, Offset__c, Is_Execute_Next__c,Generic_Email_Domains__c 
@@ -134,12 +136,29 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         
         if (RecordType != 'Mumbrella') {
             customFieldParam = ', $input: CustomFieldSearchFilterInput!';
-            customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
-            if (eventCategory == 'Security') {
+            customFieldsSection = 'customFields(input: $input , limit:10){name, definitionId, type, value},';
+            /*if (eventCategory == 'Security') {
                 customVariables = ', "input": { "names": ["Industry SEC" , "Job Function SEC" , "Company Size"] }';
-            } else {
+            } else if (eventCategory == 'Integrate') {
                 customVariables = ', "input": { "names": ["Industry INT" , "Job Function INT" , "Company Size"] }';
-            }
+            }else if (eventCategory == 'Fire') {
+                customVariables = ', "input": { "names": ["Industry FIRE" , "Job Function FIRE" , "Company Size"] }';
+            }else {
+                customVariables = ', "input": { "names": ["Industry SEC" , "Job Function SEC" , "Company Size"] }';
+            } */
+            
+            customVariables = ', "input": { "names": [' +
+                '"Industry SEC", ' +
+                '"Job Function SEC", ' +
+                '"Industry INT", ' +
+                '"Job Function INT", ' +
+                '"Industry FIRE", ' +
+                '"Job Function FIRE", ' +
+                '"Company Size", ' +
+                '"Organisation Type SEC", ' +
+                '"Organisation Type INT", ' +
+                '"Organisation Type FIRE"' +
+                '] }';
         }
         
         // Replace placeholders in the template
@@ -181,7 +200,171 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         
         return lstofresponseWrapper;
     }
-    
+
+    @TestVisible
+    private static void applyOrganisationType(Contact contactRecord, String eventsAirFieldName, Object rawValue) {
+        String organisationType = getOrganisationType(eventsAirFieldName, rawValue);
+        if (organisationType != null && getContactOrganisationTypeValues().contains(organisationType)) {
+            contactRecord.Organisation_Type__c = organisationType;
+        }
+    }
+
+    @TestVisible
+    private static void applyOrganisationType(Lead leadRecord, String eventsAirFieldName, Object rawValue) {
+        String organisationType = getOrganisationType(eventsAirFieldName, rawValue);
+        if (organisationType != null && getLeadOrganisationTypeValues().contains(organisationType)) {
+            leadRecord.Organisation_Type__c = organisationType;
+        }
+    }
+
+    private static String getOrganisationType(String eventsAirFieldName, Object rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+
+        Set<String> supportedFieldNames = new Set<String>{
+            'Organisation Type',
+            'Organisation Type FIRE',
+            'Organisation Type INT',
+            'Organisation Type SEC'
+        };
+        if (!supportedFieldNames.contains(eventsAirFieldName)) {
+            return null;
+        }
+
+        String organisationType = String.valueOf(rawValue).trim();
+        return String.isBlank(organisationType) ? null : organisationType;
+    }
+
+    private static Set<String> getLeadOrganisationTypeValues() {
+        if (leadOrganisationTypeValues == null) {
+            leadOrganisationTypeValues = getActivePicklistValues(Lead.Organisation_Type__c);
+        }
+        return leadOrganisationTypeValues;
+    }
+
+    private static Set<String> getContactOrganisationTypeValues() {
+        if (contactOrganisationTypeValues == null) {
+            contactOrganisationTypeValues = getActivePicklistValues(Contact.Organisation_Type__c);
+        }
+        return contactOrganisationTypeValues;
+    }
+
+    private static Set<String> getActivePicklistValues(Schema.SObjectField fieldToken) {
+        Set<String> values = new Set<String>();
+        for (Schema.PicklistEntry picklistEntry : fieldToken.getDescribe().getPicklistValues()) {
+            if (picklistEntry.isActive()) {
+                values.add(picklistEntry.getValue());
+            }
+        }
+        return values;
+    }
+
+    private void applyIndustryAndJobFunction(Contact contactRecord, String eventsAirFieldName, Object rawValue) {
+        String fieldValue = getCustomFieldValue(rawValue);
+        if (fieldValue == null) {
+            return;
+        }
+
+        if (isIndustryField(eventsAirFieldName) && shouldApplyEventCategoryField(eventsAirFieldName, contactRecord.Industry__c)) {
+            contactRecord.Industry__c = fieldValue;
+        }
+        if (isJobFunctionField(eventsAirFieldName) && shouldApplyEventCategoryField(eventsAirFieldName, contactRecord.Job_Function__c)) {
+            contactRecord.Job_Function__c = fieldValue;
+        }
+    }
+
+    private void applyIndustryAndJobFunction(Lead leadRecord, String eventsAirFieldName, Object rawValue) {
+        String fieldValue = getCustomFieldValue(rawValue);
+        if (fieldValue == null) {
+            return;
+        }
+
+        if (isIndustryField(eventsAirFieldName) && shouldApplyEventCategoryField(eventsAirFieldName, leadRecord.Industry__c)) {
+            leadRecord.Industry__c = fieldValue;
+        }
+        if (isJobFunctionField(eventsAirFieldName) && shouldApplyEventCategoryField(eventsAirFieldName, leadRecord.Job_Function__c)) {
+            leadRecord.Job_Function__c = fieldValue;
+        }
+    }
+
+    private static String getCustomFieldValue(Object rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+
+        String fieldValue = String.valueOf(rawValue).trim();
+        return String.isBlank(fieldValue) ? null : fieldValue;
+    }
+
+    private static Boolean isIndustryField(String eventsAirFieldName) {
+        return eventsAirFieldName == 'Industry SEC'
+            || eventsAirFieldName == 'Industry INT'
+            || eventsAirFieldName == 'Industry FIRE';
+    }
+
+    private static Boolean isJobFunctionField(String eventsAirFieldName) {
+        return eventsAirFieldName == 'Job Function SEC'
+            || eventsAirFieldName == 'Job Function INT'
+            || eventsAirFieldName == 'Job Function FIRE';
+    }
+
+    private Boolean shouldApplyEventCategoryField(String eventsAirFieldName, String currentValue) {
+        return String.isBlank(currentValue) || isPreferredEventCategoryField(eventsAirFieldName);
+    }
+
+    private Boolean isPreferredEventCategoryField(String eventsAirFieldName) {
+        if (eventCategory == 'Security') {
+            return eventsAirFieldName == 'Industry SEC' || eventsAirFieldName == 'Job Function SEC';
+        }
+        if (eventCategory == 'Integrate') {
+            return eventsAirFieldName == 'Industry INT' || eventsAirFieldName == 'Job Function INT';
+        }
+        if (eventCategory == 'Fire') {
+            return eventsAirFieldName == 'Industry FIRE' || eventsAirFieldName == 'Job Function FIRE';
+        }
+        return false;
+    }
+
+    @TestVisible
+    private static void applyAddressFields(Contact contactRecord, Map<String, Object> eventContactMap) {
+        Map<String, Object> eventAddressMap = getEventAddressMap(eventContactMap);
+        if (eventAddressMap == null || !areCoreAddressFieldsBlank(contactRecord)) {
+            return;
+        }
+
+        contactRecord.MailingCountry = getCustomFieldValue(eventAddressMap.get('country'));
+        contactRecord.MailingState = getCustomFieldValue(eventAddressMap.get('state'));
+    }
+
+    @TestVisible
+    private static void applyAddressFields(Lead leadRecord, Map<String, Object> eventContactMap) {
+        Map<String, Object> eventAddressMap = getEventAddressMap(eventContactMap);
+        if (eventAddressMap == null || !areCoreAddressFieldsBlank(leadRecord)) {
+            return;
+        }
+
+        leadRecord.Country = getCustomFieldValue(eventAddressMap.get('country'));
+        leadRecord.State = getCustomFieldValue(eventAddressMap.get('state'));
+    }
+
+    private static Boolean areCoreAddressFieldsBlank(Contact contactRecord) {
+        return String.isBlank(contactRecord.MailingStreet)
+            && String.isBlank(contactRecord.MailingCity)
+            && String.isBlank(contactRecord.MailingPostalCode);
+    }
+
+    private static Boolean areCoreAddressFieldsBlank(Lead leadRecord) {
+        return String.isBlank(leadRecord.Street)
+            && String.isBlank(leadRecord.City)
+            && String.isBlank(leadRecord.PostalCode);
+    }
+
+    private static Map<String, Object> getEventAddressMap(Map<String, Object> eventContactMap) {
+        Object eventAddress = eventContactMap.get('primaryAddress');
+        return eventAddress == null ? null : (Map<String, Object>) eventAddress;
+    }
+
     public void execute(Database.BatchableContext BC, List<ResponseWrapper> responseWrapper) {
         system.debug('responseWrapper-->'+responseWrapper);
         // Serialize the ResponseWrapper to a JSON string
@@ -468,7 +651,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         }
         
         // fetch contact from sf based on combined String
-        List<Contact> listOfAllContact = [SELECT Id, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c FROM Contact
+        List<Contact> listOfAllContact = [SELECT Id, RecordTypeId, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c, MailingCity, MailingCountry, MailingState, MailingStreet, MailingPostalCode FROM Contact
                                           WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueContactString = new Map<String, Boolean>();
         Map<String, Contact> mapOfUniqueContactStringToUpdate = new Map<String, Contact>();
@@ -480,8 +663,8 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         }
         
         // fetch Lead from sf based on combined String
-        List<Lead> listOfAllLead = [SELECT Id, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c FROM Lead
-                                    WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
+        List<Lead> listOfAllLead = [SELECT Id, RecordTypeId, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c, PostalCode, State, Country, Street, City FROM Lead
+                                    WHERE CombinedString__c in :setOfCombinedEventsAirAttendee AND IsConverted = false LIMIT 50000];
         Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
         Map<String, Lead> mapOfUniqueLeadStringToUpdate = new Map<String, Lead>();
         
@@ -530,102 +713,8 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                     Map<String, Object> eventregPaymentdetails = (Map<String, Object>) eventReg.get('paymentDetails');
                     Decimal totalcharge = (Decimal) eventregPaymentdetails.get('totalChargeAmount');
                     
-                    //create contact and account in salesforce if not exist for paid registartions
-                    if (totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString)) {
-                        
-                        // contact creation for paid registrations
-                        Contact objcon = new Contact();
-                        objcon.RecordTypeId = Schema.SObjectType.Contact.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();  
-                        
-                        if (RecordType == 'Mumbrella') {
-                            objcon.Business_Unit__c = 'Mumbrella';
-                        } else {
-                            List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
-                            for (Object fields : lsteventsairCustomFields) {
-                                Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
-                                String FieldName = (String) customFieldsMap.get('name');
-                                if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT') {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if (FieldName =='Industry SEC') {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Company Size'){
-                                        objcon.Company_Size__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function INT'){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC'){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                }
-                            }
-                            objcon.Business_Unit__c = 'Divcom'; 
-                        }
-                        
-                        objcon.Organization_Name__c = (String) eventConMap.get('organizationName');
-                        objcon.EventsAir_Con_ID__c = (String) eventConMap.get('id');
-                        String strFirstName = (String) eventConMap.get('firstName');
-                        
-                        if (strFirstName != null )  {
-                            if(strFirstName.length() <= 40) {
-                                objCon.FirstName = strFirstName.trim();
-                            } else {
-                                objCon.FirstName = strFirstName.substring(0,40).trim();
-                            }
-                        } else {
-                            objCon.FirstName = '';
-                        }
-                        
-                        String strLastName = (String) eventConMap.get('lastName');
-                        if(strLastName == null || strLastName == '') {
-                            objcon.LastName = 'UnKnown';
-                        } else {
-                            objcon.LastName = strLastName.trim();
-                        }     
-                        
-                        String strjobTitle = (String) eventConMap.get('jobTitle');
-                        if(strjobTitle == null || strjobTitle == '' ) {
-                            objcon.Title = 'UnKnown';
-                        } else {
-                            objcon.Title = strjobTitle.trim();
-                        }
-                        
-                        //objCon.Events_Air_Contact_Id__c = (String) eventConMap.get('id');
-                        String stremail = (String) eventConMap.get('primaryEmail');
-                        if(stremail != null && stremail != '') {
-                            stremail = stremail.trim();
-                            objcon.Email = stremail;
-                        } else {
-                            objcon.Email = '';
-                        }
-
-                        String strWorkPhone = (String) eventConMap.get('workPhone');
-                        if(strWorkPhone != null && strWorkPhone != '') {
-                            strWorkPhone = strWorkPhone.trim();
-                            objcon.MobilePhone = strWorkPhone;
-                            objcon.Phone = strWorkPhone;
-                        }
-                        
-                        if(setOfGenericDomain.contains(strAccdomainname)) {
-                            // Assign AccountId to contact Prioirty :- organization name match                       
-                            
-                            if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
-                                objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
-                            }
-                        } else {
-                            // Assign AccountId to contact Prioirty :-  1) domain name match 2) organization name match                       
-                            if(mapOfDomainNameAndAccId.containsKey(strAccdomainname)) {
-                                objcon.AccountId = mapOfDomainNameAndAccId.get(strAccdomainname);
-                            } else if(MapOfexistingAccountsOrgNameAndAccountId.containsKey(orgName)){
-                                objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
-                            }
-                        }
-                        lstInsrtCon.add(objcon);
-                        
-                    } else if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
+                                        // update existing contact for paid registrations; otherwise use/create a Lead
+                    if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
                         // update contact for paid function registration
                         Contact objCon = mapOfUniqueContactStringToUpdate.get(CombinedString);
                         
@@ -647,28 +736,20 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT' && (objCon.Industry__c == null || objCon.Industry__c == '')) {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if (FieldName =='Industry SEC' && (objCon.Industry__c == null || objCon.Industry__c == '')) {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Company Size' && (objCon.Company_Size__c == null || objCon.Company_Size__c == '')){
+
+                                    applyIndustryAndJobFunction(objcon, FieldName, customFieldsMap.get('value'));
+                                    if(FieldName == 'Company Size'){
                                         objcon.Company_Size__c = (String) customFieldsMap.get('value');
                                     }
-                                    if(FieldName == 'Job Function INT' && (objCon.Job_Function__c == null || objCon.Job_Function__c == '')){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC' && (objCon.Job_Function__c == null || objCon.Job_Function__c == '')){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
+                                    applyOrganisationType(objcon, FieldName, customFieldsMap.get('value'));
                                 }
                             }
                         }
                         
+                        applyAddressFields(objcon, eventconmap);
                         lstupdateCon.add(objCon);
                         
-                    } else if (!mapOfUniqueLeadString.containsKey(CombinedString)) {
+                    } else if(!mapOfUniqueContactString.containsKey(CombinedString) && !mapOfUniqueLeadString.containsKey(CombinedString)){
                         
                         //lead field mapping
                         Lead newLead = new Lead();
@@ -726,21 +807,12 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT') {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if (FieldName =='Industry SEC') {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
-                                    }
+
+                                    applyIndustryAndJobFunction(newLead, FieldName, customFieldsMap.get('value'));
                                     if(FieldName == 'Company Size'){
                                         newLead.Company_Size__c = (String) customFieldsMap.get('value');
                                     }
-                                    if(FieldName == 'Job Function INT'){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC'){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    } 
+                                    applyOrganisationType(newLead, FieldName, customFieldsMap.get('value'));
                                 }
                             }
                             newLead.Business_Unit__c = 'Divcom';
@@ -756,9 +828,11 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                         }
                         
                         newLead.Status = 'New';
+
+                        applyAddressFields(newLead, eventconmap);
                         lstInsrtLead.add(newLead);
                         
-                    } else if (mapOfUniqueLeadStringToUpdate.containsKey(CombinedString)) {
+                    } else if(!mapOfUniqueContactString.containsKey(CombinedString) && mapOfUniqueLeadStringToUpdate.containsKey(CombinedString)) {
                         // update lead for unpaid function registration
                         Lead newLead = mapOfUniqueLeadStringToUpdate.get(CombinedString);
                         
@@ -780,24 +854,17 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT' && (newLead.Industry__c == null || newLead.Industry__c == '')) {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if (FieldName =='Industry SEC' && (newLead.Industry__c == null || newLead.Industry__c == '')) {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Company Size' && (newLead.Company_Size__c == null || newLead.Company_Size__c == '')){
+
+                                    applyIndustryAndJobFunction(newLead, FieldName, customFieldsMap.get('value'));
+                                    if(FieldName == 'Company Size'){
                                         newLead.Company_Size__c = (String) customFieldsMap.get('value');
                                     }
-                                    if(FieldName == 'Job Function INT' && (newLead.Job_Function__c == null || newLead.Job_Function__c == '')){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC' && (newLead.Job_Function__c == null || newLead.Job_Function__c == '')){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
+                                    applyOrganisationType(newLead, FieldName, customFieldsMap.get('value'));
                                 }
                             }
                         }
+
+                        applyAddressFields(newLead, eventconmap);
                         lstupdateLead.add(newLead);
                     }
                 }
@@ -826,7 +893,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         
         // fetch all Lead 
         List<Lead> LstOfExtistingLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead 
-                                         WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
+                                         WHERE CombinedString__c in :setOfCombinedEventsAirAttendee AND IsConverted = false LIMIT 50000];
         
         for(Lead objLead :LstOfExtistingLead) {
             mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
@@ -884,9 +951,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                     
                     
                     if(Finalstring != null && Finalstring != '') {
-                        if(mapOfContactStringAndId.containsKey(Finalstring) && mapOfLeadStringAndId.containsKey(Finalstring)) {
-                            prodAndService.Lead__c = mapOfLeadStringAndId.get(Finalstring);
-                        }else if(mapOfContactStringAndId.containsKey(Finalstring)){
+                        if(mapOfContactStringAndId.containsKey(Finalstring)){
                             prodAndService.Contact__c = mapOfContactStringAndId.get(Finalstring);
                         }else {
                             // connect with exiting or newly created lead
@@ -920,12 +985,12 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                     }
                     mapOfEventsairRegIdandCheckidDate.put((string)eventReg.get('id'),checkInDate);
                     if (checkOutDate != null) {
-                        objreg.CheckOutDate__c	 = (Datetime) JSON.deserialize('"' + checkOutDate + '"', Datetime.class);  
+                        objreg.CheckOutDate__c   = (Datetime) JSON.deserialize('"' + checkOutDate + '"', Datetime.class);  
                     }
                     
                     if(Finalstring != null && Finalstring != '') {
                         
-                        if( totalcharge > 0 && mapOfContactStringAndId.containsKey(Finalstring)) {
+                        if( mapOfContactStringAndId.containsKey(Finalstring)) {
                             objreg.Contact__c = mapOfContactStringAndId.get(Finalstring);
                         }else {
                             if(mapOfLeadStringAndId.containsKey(Finalstring)) {
@@ -981,7 +1046,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                             objOpp.OwnerId = mapOfDomainNameAndAccOwnerId.get(strAccdomainname);
                         }
                         
-                        objOpp.Is_Private__c = false;	
+                        objOpp.Is_Private__c = false;   
                         objOpp.LeadSource = 'EventsAir';
                         if(strRegDate != null) {
                             objOpp.Closedate = Date.valueOF(strRegDate);

@@ -148,8 +148,12 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
             customFieldsSection = 'customFields(input: $input , limit:3){name, definitionId, value},';
             if (eventCategory == 'Security') {
                 customVariables = ', "input": { "names": ["Industry SEC" , "Job Function SEC" , "Company Size"] }';
-            } else {
+            } else if (eventCategory == 'Integrate') {
                 customVariables = ', "input": { "names": ["Industry INT" , "Job Function INT" , "Company Size"] }';
+            }else if (eventCategory == 'Fire') {
+                customVariables = ', "input": { "names": ["Industry FIRE" , "Job Function FIRE" , "Company Size"] }';
+            }else {
+                customVariables = ', "input": { "names": ["Industry SEC" , "Job Function SEC" , "Company Size"] }';
             }
         }
         
@@ -475,7 +479,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         }
         
         // fetch contact from sf based on combined String
-        List<Contact> listOfAllContact = [SELECT Id, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c FROM Contact
+        List<Contact> listOfAllContact = [SELECT Id, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c, MailingCity, MailingCountry, MailingState, MailingStreet, MailingPostalCode FROM Contact
                                           WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueContactString = new Map<String, Boolean>();
         Map<String, Contact> mapOfUniqueContactStringToUpdate = new Map<String, Contact>();
@@ -487,7 +491,7 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
         }
         
         // fetch Lead from sf based on combined String
-        List<Lead> listOfAllLead = [SELECT Id, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c FROM Lead
+        List<Lead> listOfAllLead = [SELECT Id, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c, PostalCode, State, Country, Street, City FROM Lead
                                     WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
         Map<String, Lead> mapOfUniqueLeadStringToUpdate = new Map<String, Lead>();
@@ -552,20 +556,32 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT') {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
+
+                                    if (eventCategory == 'Security') {
+                                        if (FieldName =='Industry SEC') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function SEC'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    } else if (eventCategory == 'Integrate') {
+                                        if (FieldName =='Industry INT') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function INT'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    }else if (eventCategory == 'Fire') {
+                                        if (FieldName =='Industry FIRE') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function FIRE'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
                                     }
-                                    if (FieldName =='Industry SEC') {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
-                                    }
+                                    
                                     if(FieldName == 'Company Size'){
                                         objcon.Company_Size__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function INT'){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC'){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
                                     }
                                 }
                             }
@@ -630,6 +646,32 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                                 objcon.AccountId = MapOfexistingAccountsOrgNameAndAccountId.get(orgName);
                             }  
                         }
+
+                        
+                        Object eventconadress = eventconmap.get('primaryAddress');
+                        Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
+                        if(eventconAdressmap != null) {
+                            if(eventconAdressmap.get('city') != null){
+                                objcon.MailingCity = (String) eventconAdressmap.get('city');  
+                            }
+                            
+                            if(eventconAdressmap.get('country') != null){
+                                objcon.MailingCountry = (String) eventconAdressmap.get('country');
+                            }
+                            
+                            if(eventconAdressmap.get('line1') != null && eventconAdressmap.get('line2') != null  && eventconAdressmap.get('line3') != null){
+                                objcon.MailingStreet = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
+                                
+                            }
+                            if(eventconAdressmap.get('state') != null){
+                                objcon.MailingState = (String) eventconAdressmap.get('state'); 
+                            }
+                            if(eventconAdressmap.get('postCode') != null){
+                                String strPostalcode = (String) eventconAdressmap.get('postCode');                    
+                                // Store only the first 20 characters in the mailingpostalcode field
+                                objcon.MailingPostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
+                            }
+                        }
                         lstInsrtCon.add(objcon);
 
                     } else if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
@@ -654,25 +696,63 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT' && (objCon.Industry__c == null || objCon.Industry__c == '')) {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
+
+                                    if (eventCategory == 'Security') {
+                                        if (FieldName =='Industry SEC') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function SEC'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    } else if (eventCategory == 'Integrate') {
+                                        if (FieldName =='Industry INT') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function INT'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    }else if (eventCategory == 'Fire') {
+                                        if (FieldName =='Industry FIRE') {
+                                            objcon.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function FIRE'){
+                                            objcon.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
                                     }
-                                    if (FieldName =='Industry SEC' && (objCon.Industry__c == null || objCon.Industry__c == '')) {
-                                        objcon.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Company Size' && (objCon.Company_Size__c == null || objCon.Company_Size__c == '')){
+                                    
+                                    if(FieldName == 'Company Size'){
                                         objcon.Company_Size__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function INT' && (objCon.Job_Function__c == null || objCon.Job_Function__c == '')){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC' && (objCon.Job_Function__c == null || objCon.Job_Function__c == '')){
-                                        objcon.Job_Function__c = (String) customFieldsMap.get('value');
                                     }
                                 }
                             }
                         }
 
+                        if(objcon.MailingCity == null && objcon.MailingCountry == null && objcon.MailingState == null && objcon.MailingStreet == null && objcon.MailingPostalCode == null) {
+                            Object eventconadress = eventconmap.get('primaryAddress');
+                            Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
+                            if(eventconAdressmap != null) {
+                                if(eventconAdressmap.get('city') != null){
+                                    objcon.MailingCity = (String) eventconAdressmap.get('city');  
+                                }
+                                
+                                if(eventconAdressmap.get('country') != null){
+                                    objcon.MailingCountry = (String) eventconAdressmap.get('country');
+                                }
+                                
+                                if(eventconAdressmap.get('line1') != null && eventconAdressmap.get('line2') != null  && eventconAdressmap.get('line3') != null){
+                                    objcon.MailingStreet = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
+                                    
+                                }
+                                if(eventconAdressmap.get('state') != null){
+                                    objcon.MailingState = (String) eventconAdressmap.get('state'); 
+                                }
+                                if(eventconAdressmap.get('postCode') != null){
+                                    String strPostalcode = (String) eventconAdressmap.get('postCode');                    
+                                    // Store only the first 20 characters in the mailingpostalcode field
+                                    objcon.MailingPostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
+                                }
+                            }
+                        }
                         lstupdateCon.add(objCon);
 
                     } else if (!mapOfUniqueLeadString.containsKey(CombinedString)) {
@@ -732,20 +812,32 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT') {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+
+                                    if (eventCategory == 'Security') {
+                                        if (FieldName =='Industry SEC') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function SEC'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    } else if (eventCategory == 'Integrate') {
+                                        if (FieldName =='Industry INT') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function INT'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    }else if (eventCategory == 'Fire') {
+                                        if (FieldName =='Industry FIRE') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function FIRE'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
                                     }
-                                    if (FieldName =='Industry SEC') {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
-                                    }
+                                    
                                     if(FieldName == 'Company Size'){
                                         newLead.Company_Size__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function INT'){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC'){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
                                     }
                                 }
                             }  
@@ -761,6 +853,31 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                             newLead.Company = 'Unknown';
                         }
                         newLead.Status = 'New';
+
+                        Object eventconadress = eventconmap.get('primaryAddress');
+                        Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
+                        if(eventconAdressmap != null) {
+                            if(eventconAdressmap.get('city') != null){
+                                newLead.City = (String) eventconAdressmap.get('city');  
+                            }
+                            
+                            if(eventconAdressmap.get('country') != null){
+                                newLead.Country = (String) eventconAdressmap.get('country');
+                            }
+                            
+                            if(eventconAdressmap.get('line1') != null && eventconAdressmap.get('line2') != null  && eventconAdressmap.get('line3') != null){
+                                newLead.Street = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
+                                
+                            }
+                            if(eventconAdressmap.get('state') != null){
+                                newLead.State = (String) eventconAdressmap.get('state'); 
+                            }
+                            if(eventconAdressmap.get('postCode') != null){
+                                String strPostalcode = (String) eventconAdressmap.get('postCode');                    
+                                // Store only the first 20 characters in the postalcode field
+                                newLead.PostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
+                            }
+                        }
                         lstInsrtLead.add(newLead);
 
                     } else if (mapOfUniqueLeadStringToUpdate.containsKey(CombinedString)) {
@@ -785,21 +902,60 @@ public class ImportFunRegSeprateSecAndInteBatch implements Database.Batchable<Re
                                 Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
                                 String FieldName = (String) customFieldsMap.get('name');
                                 if (FieldName != '' && FieldName != null) {
-                                    if (FieldName =='Industry INT' && (newLead.Industry__c == null || newLead.Industry__c == '')) {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
+
+                                    if (eventCategory == 'Security') {
+                                        if (FieldName =='Industry SEC') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function SEC'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    } else if (eventCategory == 'Integrate') {
+                                        if (FieldName =='Industry INT') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function INT'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
+                                    }else if (eventCategory == 'Fire') {
+                                        if (FieldName =='Industry FIRE') {
+                                            newLead.Industry__c =(String) customFieldsMap.get('value');
+                                        }
+                                        if(FieldName == 'Job Function FIRE'){
+                                            newLead.Job_Function__c = (String) customFieldsMap.get('value');
+                                        }
                                     }
-                                    if (FieldName =='Industry SEC' && (newLead.Industry__c == null || newLead.Industry__c == '')) {
-                                        newLead.Industry__c =(String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Company Size' && (newLead.Company_Size__c == null || newLead.Company_Size__c == '')){
+                                    
+                                    if(FieldName == 'Company Size'){
                                         newLead.Company_Size__c = (String) customFieldsMap.get('value');
                                     }
-                                    if(FieldName == 'Job Function INT' && (newLead.Job_Function__c == null || newLead.Job_Function__c == '')){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
-                                    if(FieldName == 'Job Function SEC' && (newLead.Job_Function__c == null || newLead.Job_Function__c == '')){
-                                        newLead.Job_Function__c = (String) customFieldsMap.get('value');
-                                    }
+                                }
+                            }
+                        }
+
+                        if(newLead.City == null && newLead.Country == null && newLead.State == null && newLead.Street == null && newLead.PostalCode == null) {
+                            Object eventconadress = eventconmap.get('primaryAddress');
+                            Map<String, Object> eventconAdressmap = (Map<String, Object>) eventconadress;
+                            if(eventconAdressmap != null) {
+                                if(eventconAdressmap.get('city') != null){
+                                    newLead.City = (String) eventconAdressmap.get('city');  
+                                }
+                                
+                                if(eventconAdressmap.get('country') != null){
+                                    newLead.Country = (String) eventconAdressmap.get('country');
+                                }
+                                
+                                if(eventconAdressmap.get('line1') != null && eventconAdressmap.get('line2') != null  && eventconAdressmap.get('line3') != null){
+                                    newLead.Street = (String) eventconAdressmap.get('line1')+ ' '+(String) eventconAdressmap.get('line2')+' '+(String) eventconAdressmap.get('line3');
+                                    
+                                }
+                                if(eventconAdressmap.get('state') != null){
+                                    newLead.State = (String) eventconAdressmap.get('state'); 
+                                }
+                                if(eventconAdressmap.get('postCode') != null){
+                                    String strPostalcode = (String) eventconAdressmap.get('postCode');                    
+                                    // Store only the first 20 characters in the postalcode field
+                                    newLead.PostalCode = strPostalcode != null ? strPostalcode.left(20) : null;
                                 }
                             }
                         }
