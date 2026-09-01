@@ -591,7 +591,8 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                     }
             }else {
                 System.debug('Generic Domain Name found in the list');
-                if (!setOfExistingAccountNameAndDomain.contains(accName.toLowerCase())) {
+                if (!setOfExistingAccountNameAndDomain.contains(accName.toLowerCase())
+                    && paidAccountNames.contains(accName.toLowerCase())) {
                     Account newAccount = new Account();
                     newAccount.RecordTypeId = (RecordType == 'Mumbrella') ? 
                         Schema.SObjectType.Account.getRecordTypeInfosByDeveloperName().get('Mumbrella').getRecordTypeId() : 
@@ -612,7 +613,7 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         }
         
         // if domain not match, check for account name and create map for account name with account Id
-        Map<String, String> MapOfexistingAccountsOrgNameAndAccountId = new Map<String, String>();
+        Map<String, Id> MapOfexistingAccountsOrgNameAndAccountId = new Map<String, Id>();
         if (setOfOrgNames != null) {
             
             List<Account> exitingAccListOfOrgNames = [SELECT Id,Name,Domain_Name__c From Account Where Name IN :setOfOrgNames
@@ -650,29 +651,54 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
             }
         }
         
-        // fetch contact from sf based on combined String
-        List<Contact> listOfAllContact = [SELECT Id, RecordTypeId, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c, MailingCity, MailingCountry, MailingState, MailingStreet, MailingPostalCode FROM Contact
-                                          WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
-        Map<String, Boolean> mapOfUniqueContactString = new Map<String, Boolean>();
-        Map<String, Contact> mapOfUniqueContactStringToUpdate = new Map<String, Contact>();
-        
-        //loop through existing Contacts and fill the map to use for mapping with registration
-        for(Contact objContact :listOfAllContact){
-            mapOfUniqueContactString.put(objContact.CombinedString__c, true); 
-            mapOfUniqueContactStringToUpdate.put(objContact.CombinedString__c, objContact); 
-        }
-        
-        // fetch Lead from sf based on combined String
-        List<Lead> listOfAllLead = [SELECT Id, RecordTypeId, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c, PostalCode, State, Country, Street, City FROM Lead
-                                    WHERE CombinedString__c in :setOfCombinedEventsAirAttendee AND IsConverted = false LIMIT 50000];
+        Map<String, Id> mapOfLeadStringAndConvertedContactId = new Map<String, Id>();
+        Map<Id, String> convertedContactIdToLeadString = new Map<Id, String>();
+        Set<Id> convertedContactIds = new Set<Id>();
+
+        // fetch Leads once; converted Leads only provide converted Contact, open Leads remain import candidates
+        List<Lead> listOfAllLead = [SELECT Id, RecordTypeId, Title, Company , Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName , Email, CombinedString__c, PostalCode, State, Country, Street, City, IsConverted, ConvertedContactId FROM Lead
+                                    WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];
         Map<String, Boolean> mapOfUniqueLeadString = new Map<String, Boolean>();
         Map<String, Lead> mapOfUniqueLeadStringToUpdate = new Map<String, Lead>();
-        
+
         //loop through existing Leads and fill the map to use for mapping with registration
         for(Lead objLead :listOfAllLead){
-            mapOfUniqueLeadString.put(objLead.CombinedString__c, true); 
-            mapOfUniqueLeadStringToUpdate.put(objLead.CombinedString__c, objLead); 
+            if (objLead.IsConverted && objLead.ConvertedContactId != null) {
+                mapOfLeadStringAndConvertedContactId.put(objLead.CombinedString__c, objLead.ConvertedContactId);
+                convertedContactIdToLeadString.put(objLead.ConvertedContactId, objLead.CombinedString__c);
+                convertedContactIds.add(objLead.ConvertedContactId);
+            } else if (!objLead.IsConverted) {
+                mapOfUniqueLeadString.put(objLead.CombinedString__c, true);
+                mapOfUniqueLeadStringToUpdate.put(objLead.CombinedString__c, objLead);
+            }
         }
+
+        // fetch Contacts once; includes direct matches and converted Lead contacts
+        List<Contact> listOfAllContact = [SELECT Id, AccountId, RecordTypeId, Title, Organization_Name__c, Industry__c, Job_Function__c, Company_Size__c, FirstName, LastName, Email, CombinedString__c, MailingCity, MailingCountry, MailingState, MailingStreet, MailingPostalCode, EventsAir_Con_ID__c FROM Contact
+                                          WHERE CombinedString__c in :setOfCombinedEventsAirAttendee
+                                          OR Id IN :convertedContactIds LIMIT 50000];
+        Map<String, Boolean> mapOfUniqueContactString = new Map<String, Boolean>();
+        Map<String, Contact> mapOfUniqueContactStringToUpdate = new Map<String, Contact>();
+
+        //loop through existing Contacts and fill the map to use for mapping with registration
+        for(Contact objContact :listOfAllContact){
+            String contactCombinedString = objContact.CombinedString__c;
+            if (String.isBlank(contactCombinedString)) {
+                contactCombinedString = convertedContactIdToLeadString.get(objContact.Id);
+            }
+
+            if (String.isNotBlank(contactCombinedString)) {
+                mapOfUniqueContactString.put(contactCombinedString, true);
+                mapOfUniqueContactStringToUpdate.put(contactCombinedString, objContact);
+            }
+
+            String existingContactKey = buildContactKey(objContact);
+            if (String.isNotBlank(existingContactKey)) {
+                mapOfUniqueContactString.put(existingContactKey, true);
+            }
+        }
+
+        Map<String, Id> leadStringToAccountIdForConversion = new Map<String, Id>();
         
         // loop through event's air contact for create Lead/Contact based on Paid/Unpaid registrations
         for (Object objEventCon : lsteventsairContacts) {
@@ -713,11 +739,16 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                     Map<String, Object> eventregPaymentdetails = (Map<String, Object>) eventReg.get('paymentDetails');
                     Decimal totalcharge = (Decimal) eventregPaymentdetails.get('totalChargeAmount');
                     
-                                        // update existing contact for paid registrations; otherwise use/create a Lead
+                    Id matchedAccountId = getMatchedAccountId(strAccdomainname, orgName, mapOfDomainNameAndAccId, MapOfexistingAccountsOrgNameAndAccountId);
+                    // update existing contact for paid registrations; otherwise use/create a Lead
                     if (totalcharge > 0 && mapOfUniqueContactStringToUpdate.containsKey(CombinedString)) {
                         // update contact for paid function registration
                         Contact objCon = mapOfUniqueContactStringToUpdate.get(CombinedString);
-                        
+                        objCon.EventsAir_Con_ID__c = (String) eventConMap.get('id');
+                        if (objCon.AccountId == null && matchedAccountId != null) {
+                            objCon.AccountId = matchedAccountId;
+                        }
+
                         if (objCon.Organization_Name__c == null || objCon.Organization_Name__c == '') {
                             objCon.Organization_Name__c = (String) eventConMap.get('organizationName');
                         }
@@ -748,7 +779,48 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
                         
                         applyAddressFields(objcon, eventconmap);
                         lstupdateCon.add(objCon);
+
+                    } else if(totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString) && mapOfUniqueLeadStringToUpdate.containsKey(CombinedString)) {
+                        Lead newLead = mapOfUniqueLeadStringToUpdate.get(CombinedString);
+
+                        if (newLead.Company == null || newLead.Company == '') {
+                            newLead.Company = (String) eventConMap.get('organizationName');
+                        }
+                        if (newLead.Title == null || newLead.Title == '') {
+                            String strjobTitle = (String) eventConMap.get('jobTitle');
+                            if(strjobTitle == null || strjobTitle == '' ) {
+                                newLead.Title = 'UnKnown';
+                            } else {
+                                newLead.Title = strjobTitle.trim();
+                            }
+                        }
                         
+                        if (RecordType != 'Mumbrella') {
+                            List<Object> lsteventsairCustomFields = (List<Object>) eventConMap.get('customFields');
+                            for (Object fields : lsteventsairCustomFields) {
+                                Map<String, Object> customFieldsMap = (Map<String, Object>) fields;
+                                String FieldName = (String) customFieldsMap.get('name');
+                                if (FieldName != '' && FieldName != null) {
+
+                                    applyIndustryAndJobFunction(newLead, FieldName, customFieldsMap.get('value'));
+                                    if(FieldName == 'Company Size'){
+                                        newLead.Company_Size__c = (String) customFieldsMap.get('value');
+                                    }
+                                    applyOrganisationType(newLead, FieldName, customFieldsMap.get('value'));
+                                }
+                            }
+                        }
+
+                        applyAddressFields(newLead, eventconmap);
+                        lstupdateLead.add(newLead);
+                        if (matchedAccountId != null) {
+                            leadStringToAccountIdForConversion.put(CombinedString, matchedAccountId);
+                        }
+
+                    } else if(totalcharge > 0 && !mapOfUniqueContactString.containsKey(CombinedString) && !mapOfUniqueLeadString.containsKey(CombinedString)) {
+                        Contact newContact = buildPaidContact(eventConMap, eventconmap, matchedAccountId);
+                        lstInsrtCon.add(newContact);
+
                     } else if(!mapOfUniqueContactString.containsKey(CombinedString) && !mapOfUniqueLeadString.containsKey(CombinedString)){
                         
                         //lead field mapping
@@ -877,26 +949,43 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
             system.debug('insertContactsIfNotExist');
         }
         
-        // fetch all contact after creating new contact records
-        List<Contact> LstOfExtistingContact = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Contact 
-                                               WHERE CombinedString__c in :setOfCombinedEventsAirAttendee LIMIT 50000];            
-        
-        for(Contact objContact :LstOfExtistingContact){
-            mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id); 
-        }
-        
         // Insert Lead
         if (!lstInsrtLead.isEmpty() || !lstUpdateLead.isEmpty()) {
             insertLeadsIfNotExist(lstInsrtLead, mapOfUniqueLeadString, lstUpdateLead); 
             system.debug('insertLeadsIfNotExist');
         }
-        
-        // fetch all Lead 
-        List<Lead> LstOfExtistingLead = [SELECT Id,FirstName, LastName,Email,CombinedString__c FROM Lead 
-                                         WHERE CombinedString__c in :setOfCombinedEventsAirAttendee AND IsConverted = false LIMIT 50000];
-        
-        for(Lead objLead :LstOfExtistingLead) {
-            mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id); 
+
+        if (!leadStringToAccountIdForConversion.isEmpty()) {
+            mapOfLeadStringAndConvertedContactId.putAll(convertLeadsToContacts(mapOfUniqueLeadStringToUpdate, leadStringToAccountIdForConversion));
+        }
+
+        // fill Contact map from preloaded, inserted, and converted Contacts; no extra SOQL needed
+        for(Contact objContact :listOfAllContact){
+            if (String.isNotBlank(objContact.CombinedString__c)) {
+                mapOfContactStringAndId.put(objContact.CombinedString__c, objContact.Id);
+            }
+        }
+        for(Contact objContact :lstInsrtCon){
+            if (objContact.Id != null) {
+                mapOfContactStringAndId.put(buildContactKey(objContact), objContact.Id);
+            }
+        }
+        for (String combinedString : mapOfLeadStringAndConvertedContactId.keySet()) {
+            if (!mapOfContactStringAndId.containsKey(combinedString)) {
+                mapOfContactStringAndId.put(combinedString, mapOfLeadStringAndConvertedContactId.get(combinedString));
+            }
+        }
+
+        // fill Lead map from preloaded and inserted Leads; converted Leads stay ignored
+        for(Lead objLead :listOfAllLead) {
+            if (!objLead.IsConverted && !mapOfLeadStringAndConvertedContactId.containsKey(objLead.CombinedString__c)) {
+                mapOfLeadStringAndId.put(objLead.CombinedString__c, objLead.Id);
+            }
+        }
+        for(Lead objLead :lstInsrtLead) {
+            if (objLead.Id != null) {
+                mapOfLeadStringAndId.put(buildLeadKey(objLead), objLead.Id);
+            }
         }
         
         List<Registration__c> lstInsrtReg = new List<Registration__c>(); 
@@ -1120,6 +1209,157 @@ public class ImportRegSeprateSecAndInteBatch implements Database.Batchable<Respo
         Finalstring = Finalstring.toLowerCase();
         return Finalstring;
     } 
+
+    private Id getMatchedAccountId(String domainName, String orgName, Map<String, Id> mapOfDomainNameAndAccId, Map<String, Id> mapOfOrgNameAndAccId) {
+        if (String.isNotBlank(domainName) && mapOfDomainNameAndAccId.containsKey(domainName)) {
+            return mapOfDomainNameAndAccId.get(domainName);
+        }
+        if (String.isNotBlank(orgName) && mapOfOrgNameAndAccId.containsKey(orgName)) {
+            return mapOfOrgNameAndAccId.get(orgName);
+        }
+        return null;
+    }
+
+    private static String buildContactKey(Contact contactRecord) {
+        String firstName = contactRecord.FirstName == null ? '' : contactRecord.FirstName;
+        String lastName = contactRecord.LastName == null ? 'UnKnown' : contactRecord.LastName;
+        String email = contactRecord.Email == null ? '' : contactRecord.Email;
+        return (firstName + lastName + email).toLowerCase();
+    }
+
+    private static String buildLeadKey(Lead leadRecord) {
+        String firstName = leadRecord.FirstName == null ? '' : leadRecord.FirstName;
+        String lastName = leadRecord.LastName == null ? 'UnKnown' : leadRecord.LastName;
+        String email = leadRecord.Email == null ? '' : leadRecord.Email;
+        return (firstName + lastName + email).toLowerCase();
+    }
+
+    private Contact buildPaidContact(Map<String, Object> eventConMap, Map<String, Object> eventContactMap, Id accountId) {
+        Contact newContact = new Contact();
+        newContact.RecordTypeId = Schema.SObjectType.Contact.getRecordTypeInfosByDeveloperName().get('Visitor').getRecordTypeId();
+        newContact.AccountId = accountId;
+        newContact.EventsAir_Con_ID__c = (String) eventConMap.get('id');
+
+        String firstName = (String) eventConMap.get('firstName');
+        if (String.isNotBlank(firstName)) {
+            newContact.FirstName = firstName.length() <= 40 ? firstName.trim() : firstName.substring(0, 40).trim();
+        }
+
+        String lastName = (String) eventConMap.get('lastName');
+        newContact.LastName = String.isBlank(lastName) ? 'UnKnown' : lastName.trim();
+
+        String email = (String) eventConMap.get('primaryEmail');
+        newContact.Email = String.isBlank(email) ? '' : email.trim();
+        String jobTitle = (String) eventConMap.get('jobTitle');
+        newContact.Title = String.isBlank(jobTitle) ? 'UnKnown' : jobTitle.trim();
+        newContact.Organization_Name__c = (String) eventConMap.get('organizationName');
+
+        String workPhone = (String) eventConMap.get('workPhone');
+        if (String.isNotBlank(workPhone)) {
+            newContact.Phone = workPhone.trim();
+        }
+
+        List<Object> phoneNumbers = (List<Object>) eventConMap.get('contactPhoneNumbers');
+        if (phoneNumbers != null) {
+            for (Object phoneNumber : phoneNumbers) {
+                Map<String, Object> phoneNumberMap = (Map<String, Object>) phoneNumber;
+                if (phoneNumberMap.get('mobile') != null) {
+                    newContact.MobilePhone = (String) phoneNumberMap.get('mobile');
+                    break;
+                }
+            }
+        }
+
+        if (RecordType != 'Mumbrella') {
+            List<Object> customFields = (List<Object>) eventConMap.get('customFields');
+            if (customFields != null) {
+                for (Object field : customFields) {
+                    Map<String, Object> customFieldsMap = (Map<String, Object>) field;
+                    String fieldName = (String) customFieldsMap.get('name');
+                    if (String.isNotBlank(fieldName)) {
+                        applyIndustryAndJobFunction(newContact, fieldName, customFieldsMap.get('value'));
+                        if (fieldName == 'Company Size') {
+                            newContact.Company_Size__c = (String) customFieldsMap.get('value');
+                        }
+                        applyOrganisationType(newContact, fieldName, customFieldsMap.get('value'));
+                    }
+                }
+            }
+            newContact.Business_Unit__c = 'Divcom';
+        } else {
+            newContact.Business_Unit__c = 'Mumbrella';
+        }
+
+        applyAddressFields(newContact, eventContactMap);
+        return newContact;
+    }
+
+    private static Map<String, Id> convertLeadsToContacts(Map<String, Lead> mapOfLeadStringAndLead, Map<String, Id> leadStringToAccountId) {
+        Map<String, Id> convertedContactsByCombinedString = new Map<String, Id>();
+        if (leadStringToAccountId.isEmpty()) {
+            return convertedContactsByCombinedString;
+        }
+
+        LeadStatus convertedStatus = [SELECT MasterLabel FROM LeadStatus WHERE IsConverted = true LIMIT 1];
+        List<Database.LeadConvert> leadConverts = new List<Database.LeadConvert>();
+        Map<Id, String> leadIdToCombinedString = new Map<Id, String>();
+
+        for (String combinedString : leadStringToAccountId.keySet()) {
+            Lead leadToConvert = mapOfLeadStringAndLead.get(combinedString);
+            Id accountId = leadStringToAccountId.get(combinedString);
+            if (leadToConvert != null && accountId != null) {
+                Database.LeadConvert leadConvert = new Database.LeadConvert();
+                leadConvert.setLeadId(leadToConvert.Id);
+                leadConvert.setAccountId(accountId);
+                leadConvert.setConvertedStatus(convertedStatus.MasterLabel);
+                leadConvert.setDoNotCreateOpportunity(true);
+                leadConverts.add(leadConvert);
+                leadIdToCombinedString.put(leadToConvert.Id, combinedString);
+            }
+        }
+
+        if (leadConverts.isEmpty()) {
+            return convertedContactsByCombinedString;
+        }
+
+        List<Database.LeadConvertResult> results = Database.convertLead(leadConverts, false);
+        Map<Id, Id> leadIdToContactId = new Map<Id, Id>();
+        for (Database.LeadConvertResult result : results) {
+            if (result.isSuccess() && result.getContactId() != null) {
+                leadIdToContactId.put(result.getLeadId(), result.getContactId());
+                convertedContactsByCombinedString.put(leadIdToCombinedString.get(result.getLeadId()), result.getContactId());
+            }
+        }
+
+        relinkLeadRecordsToContacts(leadIdToContactId);
+        return convertedContactsByCombinedString;
+    }
+
+    private static void relinkLeadRecordsToContacts(Map<Id, Id> leadIdToContactId) {
+        if (leadIdToContactId.isEmpty()) {
+            return;
+        }
+
+        List<Registration__c> registrationsToUpdate = new List<Registration__c>();
+        for (Registration__c registrationRecord : [SELECT Id, Lead__c, Contact__c FROM Registration__c WHERE Lead__c IN :leadIdToContactId.keySet() LIMIT 50000]) {
+            registrationRecord.Contact__c = leadIdToContactId.get(registrationRecord.Lead__c);
+            registrationRecord.Lead__c = null;
+            registrationsToUpdate.add(registrationRecord);
+        }
+        if (!registrationsToUpdate.isEmpty()) {
+            update registrationsToUpdate;
+        }
+
+        List<Product_Service_Option__c> productsAndServicesToUpdate = new List<Product_Service_Option__c>();
+        for (Product_Service_Option__c productService : [SELECT Id, Lead__c, Contact__c FROM Product_Service_Option__c WHERE Lead__c IN :leadIdToContactId.keySet() LIMIT 50000]) {
+            productService.Contact__c = leadIdToContactId.get(productService.Lead__c);
+            productService.Lead__c = null;
+            productsAndServicesToUpdate.add(productService);
+        }
+        if (!productsAndServicesToUpdate.isEmpty()) {
+            update productsAndServicesToUpdate;
+        }
+    }
     
     // Method for insert only new Contacts if not exist in salesforce
     public static void insertContactsIfNotExist(List<Contact> contactsToInsert , Map<String, Boolean> mapOfUniqueContactString , List<Contact> lstUpdateCon) {
