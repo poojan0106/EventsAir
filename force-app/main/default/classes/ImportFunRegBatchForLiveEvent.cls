@@ -1090,11 +1090,11 @@ public class ImportFunRegBatchForLiveEvent implements Database.Batchable<Respons
     }  
 
     private Id getMatchedAccountId(String domainName, String orgName, Map<String, Id> mapOfDomainNameAndAccId, Map<String, Id> mapOfOrgNameAndAccId) {
-        if (String.isNotBlank(domainName) && mapOfDomainNameAndAccId.containsKey(domainName)) {
-            return mapOfDomainNameAndAccId.get(domainName);
-        }
         if (String.isNotBlank(orgName) && mapOfOrgNameAndAccId.containsKey(orgName)) {
             return mapOfOrgNameAndAccId.get(orgName);
+        }
+        if (String.isNotBlank(domainName) && mapOfDomainNameAndAccId.containsKey(domainName)) {
+            return mapOfDomainNameAndAccId.get(domainName);
         }
         return null;
     }

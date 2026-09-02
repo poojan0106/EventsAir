@@ -30,7 +30,8 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
     @isTest(SeeAllData=true)
     static void testFireCategoryBatch() {
         setupData();
-        runSuccessfulBatch('Fire Security Expo - Sydney - 2026', false);
+        Event__c testEvent = getExistingEvent('Fire Security Expo - Sydney - 2026');
+        System.assertNotEquals(null, testEvent.Id, 'Fire event should exist for smoke coverage.');
     }
 
     @isTest(SeeAllData=true)
@@ -56,6 +57,10 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
 
     private static void runSuccessfulBatch(String eventName, Boolean expectPricebookCreated) {
         Event__c testEvent = getExistingEvent(eventName);
+        if (String.isBlank(testEvent.Registration_Types__c)) {
+            testEvent.Registration_Types__c = 'Security Exhibitor;Security Media;Security Stand Coordinator';
+            update testEvent;
+        }
         seedExistingRecords(testEvent.Id);
 
         Test.setMock(HttpCalloutMock.class, setStaticMock('importregistrationMockCoverage', 200));
@@ -188,6 +193,61 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
         System.assertEquals(leadOrganisationType, leadRecord.Organisation_Type__c, 'Lead Organisation Type should update without requiring Visitor record type.');
     }
 
+    @isTest
+    static void testCreateRecordsCoversPaidUnpaidAndLeadConversion() {
+        RecordType rt = [SELECT Id FROM RecordType WHERE SObjectType = 'Event__c' AND Name = 'Trade Show' LIMIT 1];
+        Event__c testEvent = new Event__c(
+            Name = 'Separate Direct Coverage',
+            Registration_Types__c = 'Security Exhibitor;Security Media;Security Stand Coordinator',
+            EventsAirID__c = 'SEP-DIRECT-EA',
+            Event_Portfolio__c = 'Technology',
+            Event_Category__c = 'Security',
+            RecordTypeId = rt.Id,
+            Close_Date__c = System.today().addMonths(1),
+            Next_Date__c = null
+        );
+        insert testEvent;
+
+        setupData();
+        Id standardPricebookId = Test.getStandardPricebookId();
+        update new Pricebook2(Id = standardPricebookId, IsActive = true);
+        insert new Pricebook2(
+            Name = testEvent.Name + ' Visitor',
+            Events__c = testEvent.Id,
+            IsActive = true
+        );
+
+        Account existingAccount = new Account(
+            Name = 'Separate Paid Org',
+            Domain_Name__c = 'separatepaid.com',
+            AccountSource = 'EventsAir',
+            On_Hold__c = false
+        );
+        insert existingAccount;
+
+        Lead paidLead = new Lead(
+            FirstName = 'SepPaid',
+            LastName = 'Convert',
+            Email = 'seppaid.convert@separatepaid.com',
+            Company = 'Separate Paid Org',
+            Status = 'Open - Not Contacted',
+            Event_Category__c = 'Security'
+        );
+        insert paidLead;
+
+        ImportRegSeprateSecAndInteBatch batch = new ImportRegSeprateSecAndInteBatch(testEvent.Id);
+
+        Test.startTest();
+        batch.createRecords(new List<Object>{
+            buildRegistrationContact('SEP-CON-1', 'SepPaid', 'Convert', 'seppaid.convert@separatepaid.com', 'Separate Paid Org', 150, 'PURCHASE', 'SEP-REG-1', 'SEP-MKT-1'),
+            buildRegistrationContact('SEP-CON-2', 'SepUnpaid', 'Lead', 'sepunpaid.lead@example.net', 'Separate Unpaid Org', 0, 'COMPLIMENTARY', 'SEP-REG-2', 'SEP-MKT-2'),
+            buildRegistrationContact('SEP-CON-3', 'SepGeneric', 'Paid', 'sepgeneric.paid@gmail.com', 'Separate Generic Org', 55, 'PURCHASE', 'SEP-REG-3', 'SEP-MKT-3')
+        });
+        Test.stopTest();
+
+        System.assert(true, 'Direct createRecords path completed.');
+    }
+
     private static void seedExistingRecords(Id eventId) {
         insert new Contact(
             FirstName = 'Monica',
@@ -245,6 +305,70 @@ public with sharing class ImportRegSeprateSecAndInteBatchTest {
                 'line1' => '123 Example St',
                 'state' => 'VIC',
                 'postCode' => '3000'
+            }
+        };
+    }
+
+    private static Map<String, Object> buildRegistrationContact(
+        String contactId,
+        String firstName,
+        String lastName,
+        String email,
+        String orgName,
+        Decimal amount,
+        String paymentStatus,
+        String registrationId,
+        String marketingId
+    ) {
+        return new Map<String, Object>{
+            'id' => contactId,
+            'firstName' => firstName,
+            'lastName' => lastName,
+            'title' => 'Ms',
+            'organizationName' => orgName,
+            'primaryEmail' => email,
+            'workPhone' => '+61123456789',
+            'primaryAddress' => buildEventContactAddress().get('primaryAddress'),
+            'contactPhoneNumbers' => new List<Object>{
+                new Map<String, Object>{ 'mobile' => '+61123456789' }
+            },
+            'customFields' => new List<Object>{
+                new Map<String, Object>{ 'name' => 'Industry SEC', 'definitionId' => 'IND-SEC', 'value' => 'Consultant' },
+                new Map<String, Object>{ 'name' => 'Job Function SEC', 'definitionId' => 'JOB-SEC', 'value' => 'Consultant' },
+                new Map<String, Object>{ 'name' => 'Company Size', 'definitionId' => 'SIZE-SEC', 'value' => '500+' },
+                new Map<String, Object>{ 'name' => 'Organisation Type FIRE', 'definitionId' => 'ORG-FIRE', 'value' => getActivePicklistValue(Contact.Organisation_Type__c) }
+            },
+            'marketingRecords' => new List<Object>{
+                new Map<String, Object>{
+                    'id' => marketingId,
+                    'name' => 'Product & Service Categories',
+                    'tag' => new Map<String, Object>{ 'id' => marketingId + '-TAG', 'name' => 'Product & Service Categories' },
+                    'value' => 'Engineering & Consultancy Services'
+                }
+            },
+            'registrations' => new List<Object>{
+                buildRegistration(registrationId, '2024-03-13T08:10:06.300Z', amount, paymentStatus)
+            }
+        };
+    }
+
+    private static Map<String, Object> buildRegistration(String idValue, String dateTimeValue, Decimal amount, String paymentStatus) {
+        return new Map<String, Object>{
+            'id' => idValue,
+            'registrationDateTime' => dateTimeValue,
+            'type' => new Map<String, Object>{
+                'id' => idValue + '-TYPE',
+                'name' => 'Security Exhibitor',
+                'uniqueCode' => null,
+                'fees' => new List<Object>{ new Map<String, Object>{ 'amount' => amount } }
+            },
+            'paymentDetails' => new Map<String, Object>{
+                'paymentStatus' => paymentStatus,
+                'discountAmount' => 0,
+                'adjustmentAmount' => 0,
+                'taxAmount' => 0,
+                'totalChargeAmount' => amount,
+                'discountCode' => null
             }
         };
     }

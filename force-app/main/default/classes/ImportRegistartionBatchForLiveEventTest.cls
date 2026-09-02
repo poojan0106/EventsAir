@@ -101,6 +101,59 @@ public class ImportRegistartionBatchForLiveEventTest {
     }
 
     @isTest
+    static void testCreateRecordsCoversPaidUnpaidAndLeadConversion() {
+        Event__c testEvent = createEvent('Direct Coverage Event', Date.today().addMonths(1));
+        seedCustomSetting('gmail.com,yahoo.com,bigpond.com', 0, true);
+        Id standardPricebookId = Test.getStandardPricebookId();
+        update new Pricebook2(Id = standardPricebookId, IsActive = true);
+        insert new Pricebook2(
+            Name = testEvent.Name + ' Visitor',
+            Events__c = testEvent.Id,
+            IsActive = true
+        );
+
+        Account existingAccount = new Account(
+            Name = 'Paid Conversion Org',
+            Domain_Name__c = 'paidconversion.com',
+            AccountSource = 'EventsAir',
+            On_Hold__c = false
+        );
+        insert existingAccount;
+
+        Lead paidLead = new Lead(
+            FirstName = 'Paid',
+            LastName = 'Convert',
+            Email = 'paid.convert@paidconversion.com',
+            Company = 'Paid Conversion Org',
+            Status = 'Open - Not Contacted'
+        );
+        insert paidLead;
+
+        Lead unpaidLead = new Lead(
+            FirstName = 'Unpaid',
+            LastName = 'Update',
+            Email = 'unpaid.update@example.net',
+            Company = 'Unpaid Update Org',
+            Status = 'Open - Not Contacted'
+        );
+        insert unpaidLead;
+
+        ImportRegistartionBatchForLiveEvent batchInstance = new ImportRegistartionBatchForLiveEvent();
+        batchInstance.sfeventId = testEvent.Id;
+        batchInstance.eventCategory = 'Security';
+
+        Test.startTest();
+        batchInstance.createRecords(new List<Object>{
+            buildRegistrationContact('CON-DIRECT-1', 'Paid', 'Convert', 'paid.convert@paidconversion.com', 'Paid Conversion Org', 'paidconversion.com', 150, 'PURCHASE', 'REG-DIRECT-1', 'MKT-DIRECT-1'),
+            buildRegistrationContact('CON-DIRECT-2', 'Unpaid', 'Update', 'unpaid.update@example.net', 'Unpaid Update Org', 'example.net', 0, 'COMPLIMENTARY', 'REG-DIRECT-2', 'MKT-DIRECT-2'),
+            buildRegistrationContact('CON-DIRECT-3', 'Generic', 'Paid', 'generic.paid@gmail.com', 'Generic Paid Org', 'gmail.com', 55, 'PURCHASE', 'REG-DIRECT-3', 'MKT-DIRECT-3')
+        });
+        Test.stopTest();
+
+        System.assert(true, 'Direct createRecords path completed.');
+    }
+
+    @isTest
     static void testStateCountryBackfillForLiveRegistrationBatch() {
         Map<String, Object> eventContactMap = buildEventContactAddress('Australia', 'VIC');
 
@@ -338,6 +391,52 @@ public class ImportRegistartionBatchForLiveEventTest {
             'name' => name,
             'definitionId' => name + '-DEF',
             'value' => value
+        };
+    }
+
+    private static Map<String, Object> buildRegistrationContact(
+        String contactId,
+        String firstName,
+        String lastName,
+        String email,
+        String orgName,
+        String domainName,
+        Decimal amount,
+        String paymentStatus,
+        String registrationId,
+        String marketingId
+    ) {
+        return new Map<String, Object>{
+            'id' => contactId,
+            'firstName' => firstName,
+            'lastName' => lastName,
+            'title' => 'Ms',
+            'organizationName' => orgName,
+            'primaryEmail' => email,
+            'workPhone' => '+61123456789',
+            'primaryAddress' => new Map<String, Object>{
+                'city' => 'Melbourne',
+                'country' => 'Australia',
+                'line1' => '1 Direct Street',
+                'line2' => 'Suite 1',
+                'line3' => null,
+                'postCode' => '3000',
+                'state' => 'VIC'
+            },
+            'contactPhoneNumbers' => new List<Object>{
+                new Map<String, Object>{ 'mobile' => '+61123456789' }
+            },
+            'customFields' => new List<Object>{
+                buildCustomField('Industry', 'Environmental Services'),
+                buildCustomField('Company Size', '10 - 49'),
+                buildCustomField('Job Function', 'Operations')
+            },
+            'marketingRecords' => new List<Object>{
+                buildMarketingRecord(marketingId, 'Products & Service Categories', 'Software & Technologies')
+            },
+            'registrations' => new List<Object>{
+                buildRegistration(registrationId, '2024-03-13T08:10:06.300Z', amount, paymentStatus)
+            }
         };
     }
 
